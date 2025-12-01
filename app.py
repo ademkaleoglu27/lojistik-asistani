@@ -1,82 +1,114 @@
 import streamlit as st
-import requests
 import pandas as pd
+import requests
 import time
-import os
 import re
 import urllib.parse
-import shutil # Yedekleme için
-import plotly.express as px # Grafikler için
 from datetime import datetime, date
+import plotly.express as px
+
+# Google Sheets Kütüphaneleri
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(
-    page_title="Lojistik Pro", 
-    page_icon="🚛", 
+    page_title="Lojistik Pro (Bulut)", 
+    page_icon="☁️", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # --- SABİTLER ---
-CRM_DOSYASI = "crm_data.csv"
-YEDEK_KLASORU = "yedekler"
-# Kendi API Anahtarını buraya yapıştır:
-API_KEY = "AIzaSyCw0bhZ2WTrZtThjgJBMsbjZ7IDh6QN0Og" 
+SHEET_ADI = "Lojistik_Verileri" # Google'da açtığın tablonun adı
+# API KEY (Harita için) - Secrets'dan da çekilebilir ama buraya yazalım
+API_KEY = "BURAYA_API_KEYINI_YAPISTIR" 
 
-# --- ARAMA KATEGORİLERİ (ÖZEL LİSTE) ---
+# --- ARAMA KATEGORİLERİ ---
 SEKTORLER = {
     "🚛 Lojistik Firmaları": "Lojistik Firmaları",
-    "📦 Yurt İçi Taşıma/Nakliye": "Yurt İçi Nakliye ve Taşımacılık Firmaları",
-    "🌍 Uluslararası Lojistik": "Uluslararası Lojistik ve Transport Firmaları",
-    "🤝 Taşıyıcılar & Kamyoncular Koop.": "Kamyoncular ve Taşıyıcılar Kooperatifi",
-    "🚌 Personel ve Öğrenci Servisi": "Personel ve Öğrenci Taşımacılığı Turizm Firmaları",
-    "🎫 Turizm & Otobüs Firmaları": "Turizm ve Otobüs İşletmeleri",
-    "🏭 Gıda Firmaları (Potansiyel Müşteri)": "Gıda Üreticileri ve Toptancıları Fabrikaları",
-    "🏥 Rehabilitasyon Merkezleri (Servis İçin)": "Özel Eğitim ve Rehabilitasyon Merkezleri",
-    "🏗️ İnşaat & Yapı Malzemeleri": "İnşaat ve Yapı Malzemeleri Toptancıları",
-    "🏭 Organize Sanayi Fabrikaları": "Organize Sanayi Bölgesi Fabrikaları"
+    "📦 Yurt İçi Nakliye": "Yurt İçi Nakliye Firmaları",
+    "🌍 Uluslararası Lojistik": "Uluslararası Transport",
+    "🤝 Kamyoncular Koop.": "Kamyoncular Kooperatifi",
+    "🚌 Personel Servisi": "Personel Taşımacılığı",
+    "🏭 Gıda Toptancıları": "Gıda Toptancıları ve Üreticileri",
+    "🏥 Rehabilitasyon Merkezleri": "Özel Eğitim ve Rehabilitasyon",
+    "🏗️ İnşaat Malzemeleri": "İnşaat Malzemeleri Toptancıları",
+    "🏭 Organize Sanayi": "Organize Sanayi Bölgesi Fabrikaları"
 }
 
-# --- YARDIMCI FONKSİYONLAR ---
+# --- GOOGLE SHEETS BAĞLANTISI ---
+def get_google_sheet_client():
+    """Secrets'daki anahtarı kullanarak Google'a bağlanır"""
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    
+    # Secrets içindeki bilgileri al
+    creds_dict = dict(st.secrets["gcp_service_account"])
+    
+    # Eğer 'info' diye tek bir satırda yapıştırdıysan (JSON string yöntemi)
+    if "info" in creds_dict:
+        import json
+        creds_dict = json.loads(creds_dict["info"])
+        
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    return client
+
 def veri_tabanini_yukle():
-    if os.path.exists(CRM_DOSYASI):
-        df = pd.read_csv(CRM_DOSYASI)
+    """Google Sheets'ten verileri çeker"""
+    try:
+        client = get_google_sheet_client()
+        sheet = client.open(SHEET_ADI).sheet1
+        data = sheet.get_all_records()
         
-        # Eksik sütunları tamamla
-        yeni_sutunlar = ["Sozlesme_Tarihi", "Tuketim_Bilgisi", "Hatirlatici_Tarih"]
-        for col in yeni_sutunlar:
-            if col not in df.columns:
-                df[col] = None
+        if not data:
+            # Tablo boşsa başlıkları oluştur
+            basliklar = ["Firma", "Telefon", "Adres", "Durum", "Notlar", "Sozlesme_Tarihi", "Tuketim_Bilgisi", "Hatirlatici_Tarih"]
+            sheet.append_row(basliklar)
+            return pd.DataFrame(columns=basliklar)
+            
+        df = pd.DataFrame(data)
         
-        # Veri tiplerini zorla (Hata önleyici)
+        # Veri tiplerini düzelt
         text_cols = ["Notlar", "Telefon", "Tuketim_Bilgisi", "Firma", "Adres", "Durum"]
         for col in text_cols:
             if col in df.columns:
                 df[col] = df[col].astype(str).replace("nan", "").replace("None", "")
-            
-        # Tarih formatlarını düzelt
-        df["Hatirlatici_Tarih"] = pd.to_datetime(df["Hatirlatici_Tarih"], errors='coerce')
-        df["Sozlesme_Tarihi"] = pd.to_datetime(df["Sozlesme_Tarihi"], errors='coerce')
-
+        
+        # Tarih formatları
+        for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi"]:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+                
         return df
-    else:
-        return pd.DataFrame(columns=[
-            "Firma", "Telefon", "Adres", "Durum", "Notlar", 
-            "Sozlesme_Tarihi", "Tuketim_Bilgisi", "Hatirlatici_Tarih"
-        ])
+        
+    except Exception as e:
+        # Bağlantı hatası olursa (örneğin ilk açılışta tablo bulunamazsa)
+        st.error(f"Google Sheets Bağlantı Hatası: {e}")
+        st.info("Lütfen Google Drive'da 'Lojistik_Verileri' adında bir tablo olduğundan ve robotla paylaşıldığından emin olun.")
+        return pd.DataFrame(columns=["Firma", "Telefon", "Adres", "Durum", "Notlar", "Sozlesme_Tarihi", "Tuketim_Bilgisi", "Hatirlatici_Tarih"])
 
 def veriyi_kaydet(df):
-    # 1. Önce Yedek Al
-    if not os.path.exists(YEDEK_KLASORU):
-        os.makedirs(YEDEK_KLASORU)
-    
-    tarih_damgasi = datetime.now().strftime("%Y%m%d_%H%M%S")
-    if os.path.exists(CRM_DOSYASI):
-        shutil.copy(CRM_DOSYASI, f"{YEDEK_KLASORU}/yedek_{tarih_damgasi}.csv")
+    """Verileri Google Sheets'e yazar (Tamamen silip yeniden yazar)"""
+    try:
+        client = get_google_sheet_client()
+        sheet = client.open(SHEET_ADI).sheet1
+        
+        # Tarihleri string formatına çevir (Excel anlasın diye)
+        df_save = df.copy()
+        for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi"]:
+            if col in df_save.columns:
+                df_save[col] = df_save[col].dt.strftime('%Y-%m-%d').replace("NaT", "")
+        
+        # Sayfayı temizle ve yeniden yaz
+        sheet.clear()
+        # Başlıkları ve veriyi ekle
+        sheet.update([df_save.columns.values.tolist()] + df_save.values.tolist())
+        
+    except Exception as e:
+        st.error(f"Kayıt Başarısız: {e}")
 
-    # 2. Kaydet
-    df.to_csv(CRM_DOSYASI, index=False)
-
+# --- YARDIMCI FONKSİYONLAR ---
 def whatsapp_linki_yap(telefon):
     if pd.isna(telefon) or not telefon or len(str(telefon)) < 5: return None
     temiz_no = re.sub(r'\D', '', str(telefon))
@@ -106,105 +138,81 @@ def detay_getir(place_id):
 # --- YAN MENÜ ---
 with st.sidebar:
     st.title("🚛 Lojistik Asistanı")
-    st.write("Saha Satış Yönetim Paneli v7.0")
+    st.caption("Bulut Versiyon v8.0")
     st.markdown("---")
     
     secim = st.radio(
         "Menü",
-        ["🏠 Dashboard & Analiz", "🗺️ Gelişmiş Arama", "📂 Portföy & İşlemler"],
+        ["🏠 Dashboard", "🗺️ Firma Arama", "📂 Portföy (Kalıcı)"],
         index=0
     )
-    
     st.markdown("---")
     
-    # TEKLİF SİHİRBAZI (YENİ)
-    with st.expander("📝 Hızlı Mesaj Şablonları"):
-        sablon_turu = st.selectbox("Şablon Seç", ["Tanışma", "Fiyat Teklifi", "Randevu Talebi"])
-        if sablon_turu == "Tanışma":
-            mesaj = "Merhaba, [Firma] adına yazıyorum. Bölgenizdeki lojistik/servis ihtiyaçlarınız için firmanızla tanışmak isteriz. Müsaitliğinizde görüşmek dileğiyle."
-        elif sablon_turu == "Fiyat Teklifi":
-            mesaj = "Sayın Yetkili, talep ettiğiniz güzergah/hizmet için güncel fiyat çalışmamızı hazırladık. Detayları ne zaman konuşabiliriz?"
+    with st.expander("📝 Hızlı Şablonlar"):
+        sablon = st.selectbox("Seç:", ["Tanışma", "Fiyat Teklifi"])
+        if sablon == "Tanışma":
+            st.code("Merhaba, [Firma] adına yazıyorum. Bölgenizdeki yükleriniz için tanışmak isteriz.", language="text")
         else:
-            mesaj = "Merhaba, hizmetlerimizle ilgili size kısa bir sunum yapmak için 10 dakikanızı rica ediyoruz. Haftaya hangi gün uygun olursunuz?"
-        
-        st.code(mesaj, language="text")
-        st.caption("Kopyalamak için sağ üstteki ikona basın.")
+            st.code("Sayın Yetkili, talep ettiğiniz güzergah için fiyat çalışmamız ektedir.", language="text")
 
-# --- SAYFA 1: DASHBOARD & ANALİZ ---
-if secim == "🏠 Dashboard & Analiz":
+# --- SAYFA 1: DASHBOARD ---
+if secim == "🏠 Dashboard":
     st.title("📊 Yönetim Paneli")
-    df = veri_tabanini_yukle()
     
-    # Üst İstatistikler
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Toplam Firma", len(df), border=True)
-    with col2:
-        yeni = len(df[df["Durum"] == "Yeni"])
-        st.metric("Aranacak (Yeni)", yeni, border=True)
-    with col3:
-        teklif = len(df[df["Durum"] == "⏳ Teklif Verildi"])
-        st.metric("Teklif Aşamasında", teklif, border=True)
-    with col4:
-        anlasma = len(df[df["Durum"] == "✅ Anlaşıldı"])
-        st.metric("Kazanılan Müşteri", anlasma, delta="Başarılı", border=True)
-
+    with st.spinner("Google E-Tablo'dan veriler çekiliyor..."):
+        df = veri_tabanini_yukle()
+    
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Toplam Firma", len(df), border=True)
+    c2.metric("Bekleyen", len(df[df["Durum"] == "Yeni"]), border=True)
+    c3.metric("Anlaşılan", len(df[df["Durum"] == "✅ Anlaşıldı"]), border=True)
+    
     st.markdown("---")
     
-    # GRAFİKLER (YENİ)
     if not df.empty:
+        # Grafikler
         g1, g2 = st.columns(2)
         with g1:
-            st.subheader("📈 Portföy Durum Dağılımı")
+            st.subheader("Durum Analizi")
             durum_sayilari = df["Durum"].value_counts().reset_index()
             durum_sayilari.columns = ["Durum", "Adet"]
-            fig1 = px.pie(durum_sayilari, values="Adet", names="Durum", hole=0.4)
-            st.plotly_chart(fig1, use_container_width=True)
-            
+            fig = px.pie(durum_sayilari, values="Adet", names="Durum", hole=0.4)
+            st.plotly_chart(fig, use_container_width=True)
+        
         with g2:
-            st.subheader("🔔 Bugünün Ajandası")
-            bugun = pd.Timestamp.now().normalize()
+            st.subheader("🔔 Bugünün İşleri")
             if "Hatirlatici_Tarih" in df.columns:
+                bugun = pd.Timestamp.now().normalize()
                 hatirlatmalar = df[
                     (df["Hatirlatici_Tarih"] <= bugun) & 
                     (df["Hatirlatici_Tarih"].notnull()) &
                     (df["Durum"] != "✅ Anlaşıldı")
                 ]
                 if not hatirlatmalar.empty:
-                    st.error(f"Bugün ilgilenmen gereken {len(hatirlatmalar)} iş var!")
-                    st.dataframe(
-                        hatirlatmalar[["Firma", "Telefon", "Notlar"]],
-                        hide_index=True,
-                        use_container_width=True
-                    )
+                    st.error(f"{len(hatirlatmalar)} adet bekleyen iş var!")
+                    st.dataframe(hatirlatmalar[["Firma", "Notlar"]], hide_index=True)
                 else:
-                    st.success("Bugün için planlanmış acil bir işiniz yok. Sahaya çıkma zamanı! 🚗")
-    else:
-        st.info("Henüz veri yok. Arama menüsünden firma ekleyerek başlayın.")
+                    st.success("Bugün için hatırlatma yok.")
 
-# --- SAYFA 2: GELİŞMİŞ ARAMA ---
-elif secim == "🗺️ Gelişmiş Arama":
-    st.title("🗺️ Sektörel Firma Tarama")
+# --- SAYFA 2: ARAMA ---
+elif secim == "🗺️ Firma Arama":
+    st.title("🗺️ Sektörel Tarama")
     
-    col1, col2 = st.columns([2, 2])
-    with col1:
-        sehir = st.text_input("📍 Şehir", "Gaziantep")
-    with col2:
-        # Gelişmiş Sektör Listesi
-        secilen_etiket = st.selectbox("🎯 Aranacak Sektör/Firma Türü", list(SEKTORLER.keys()))
-        arama_sorgusu = SEKTORLER[secilen_etiket] # Arka planda Google'a gidecek gerçek sorgu
+    c1, c2 = st.columns(2)
+    sehir = c1.text_input("📍 Şehir", "Gaziantep")
+    sektor_key = c2.selectbox("🚛 Sektör", list(SEKTORLER.keys()))
     
     if st.button("🔍 Firmaları Bul", type="primary", use_container_width=True):
-        st.info(f"📡 '{sehir}' bölgesinde '{arama_sorgusu}' aranıyor...")
+        arama_sorgusu = SEKTORLER[sektor_key]
+        st.info(f"📡 {sehir} bölgesinde '{arama_sorgusu}' aranıyor...")
         
         tum_firmalar = []
         next_page_token = None
-        sayfa_sayisi = 0
+        sayfa = 0
         bar = st.progress(0)
         
-        while sayfa_sayisi < 3: 
+        while sayfa < 3:
             url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
-            # Burada 'arama_sorgusu' kullanıyoruz
             params = {'query': f"{sehir} {arama_sorgusu}", 'key': API_KEY, 'language': 'tr'}
             if next_page_token:
                 params['pagetoken'] = next_page_token
@@ -213,87 +221,60 @@ elif secim == "🗺️ Gelişmiş Arama":
             try:
                 resp = requests.get(url, params=params).json()
                 results = resp.get('results', [])
-                
-                for firma in results:
-                    ad = firma.get('name')
-                    geo = firma.get('geometry', {}).get('location', {})
-                    tel = detay_getir(firma.get('place_id'))
-                    
+                for f in results:
+                    geo = f.get('geometry', {}).get('location', {})
                     tum_firmalar.append({
-                        "Firma": ad,
-                        "Telefon": tel,
-                        "Adres": firma.get('formatted_address'),
+                        "Firma": f.get('name'),
+                        "Telefon": detay_getir(f.get('place_id')),
+                        "Adres": f.get('formatted_address'),
                         "lat": geo.get('lat'),
                         "lon": geo.get('lng'),
-                        "Durum": "Yeni", 
-                        "Notlar": "",
-                        "Tuketim_Bilgisi": ""
+                        "Durum": "Yeni", "Notlar": "", "Tuketim_Bilgisi": ""
                     })
                     time.sleep(0.05)
                 
                 next_page_token = resp.get('next_page_token')
-                sayfa_sayisi += 1
-                bar.progress(sayfa_sayisi/3)
+                sayfa += 1
+                bar.progress(sayfa/3)
                 if not next_page_token: break
+            except: break
             
-            except Exception as e:
-                st.error(f"Hata: {e}")
-                break
-        
         if tum_firmalar:
             df_temp = pd.DataFrame(tum_firmalar)
             df_temp.insert(0, "Seç", False)
-            st.session_state['arama_sonuclari'] = df_temp
-            st.success(f"✅ {len(tum_firmalar)} potansiyel müşteri bulundu.")
+            st.session_state['sonuclar'] = df_temp
+            st.success(f"✅ {len(tum_firmalar)} firma bulundu.")
         else:
-            st.error("Sonuç bulunamadı.")
-
-    if 'arama_sonuclari' in st.session_state:
-        df_sonuc = st.session_state['arama_sonuclari']
+            st.error("Sonuç yok.")
+            
+    if 'sonuclar' in st.session_state:
+        df_res = st.session_state['sonuclar']
+        st.map(df_res.dropna(subset=['lat','lon']), latitude='lat', longitude='lon', color='#ff0000')
         
-        st.write("### 📍 Konum Haritası")
-        map_data = df_sonuc.dropna(subset=['lat', 'lon'])
-        if not map_data.empty:
-            st.map(map_data, latitude='lat', longitude='lon', size=20, color='#ff0000')
+        edited = st.data_editor(df_res, column_config={"Seç": st.column_config.CheckboxColumn("Ekle?", default=False)}, hide_index=True)
         
-        st.write("### 📋 Sonuç Listesi")
-        edited_df = st.data_editor(
-            df_sonuc,
-            column_config={
-                "Seç": st.column_config.CheckboxColumn("Ekle?", default=False),
-                "Firma": st.column_config.TextColumn("Firma", disabled=True),
-                "Telefon": st.column_config.TextColumn("Telefon", disabled=True),
-            },
-            hide_index=True,
-            use_container_width=True
-        )
-        
-        if st.button("💾 SEÇİLENLERİ PORTFÖYE EKLE", type="primary"):
-            secilenler = edited_df[edited_df["Seç"] == True].copy()
+        if st.button("💾 Google E-Tabloya Kaydet", type="primary"):
+            secilenler = edited[edited["Seç"]==True].drop(columns=["Seç", "lat", "lon"], errors='ignore')
             if not secilenler.empty:
-                kayit_icin = secilenler.drop(columns=["Seç", "lat", "lon"], errors='ignore')
                 mevcut = veri_tabanini_yukle()
-                yeni = pd.concat([mevcut, kayit_icin], ignore_index=True).drop_duplicates(subset=['Firma'])
+                yeni = pd.concat([mevcut, secilenler], ignore_index=True).drop_duplicates(subset=['Firma'])
                 veriyi_kaydet(yeni)
-                st.toast(f"{len(secilenler)} firma eklendi! Otomatik yedek alındı.", icon="✅")
+                st.toast("Veriler Buluta Kaydedildi! ☁️", icon="✅")
                 time.sleep(1)
             else:
                 st.warning("Seçim yapın.")
 
 # --- SAYFA 3: PORTFÖY ---
-elif secim == "📂 Portföy & İşlemler":
-    st.title("📂 Detaylı Müşteri Portföyü")
+elif secim == "📂 Portföy (Kalıcı)":
+    st.title("📂 Bulut Portföyü")
     
-    df_crm = veri_tabanini_yukle()
-    
-    # Rapor İndirme Butonu (Buraya da koydum)
-    csv = df_crm.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Excel Raporu İndir", csv, f"Saha_Raporu_{time.strftime('%d_%m')}.csv", "text/csv")
+    with st.spinner("Veriler yükleniyor..."):
+        df_crm = veri_tabanini_yukle()
     
     if not df_crm.empty:
         if "Sil" not in df_crm.columns: df_crm.insert(0, "Sil", False)
         
-        # Linkleri Oluştur
+        # Linkler
         df_crm["WhatsApp"] = df_crm["Telefon"].apply(whatsapp_linki_yap)
         df_crm["Ara"] = df_crm["Telefon"].apply(arama_linki_yap)
         df_crm["Yol_Tarifi"] = df_crm["Adres"].apply(harita_linki_yap)
@@ -302,21 +283,14 @@ elif secim == "📂 Portföy & İşlemler":
             df_crm,
             column_config={
                 "Sil": st.column_config.CheckboxColumn("Sil", width="small"),
-                "Firma": st.column_config.TextColumn("Firma Adı", disabled=True),
-                
-                # İKONLAR
+                "Firma": st.column_config.TextColumn("Firma", disabled=True),
                 "Ara": st.column_config.LinkColumn("📞", display_text="Ara", width="small"),
                 "WhatsApp": st.column_config.LinkColumn("💬", display_text="Mesaj", width="small"),
                 "Yol_Tarifi": st.column_config.LinkColumn("🗺️", display_text="Git", width="small"),
-                
-                # VERİLER
-                "Durum": st.column_config.SelectboxColumn("Durum", options=["Yeni", "📞 Arandı", "⏳ Teklif Verildi", "✅ Anlaşıldı", "❌ Olumsuz", "📅 Randevu"], width="medium"),
-                "Tuketim_Bilgisi": st.column_config.TextColumn("Potansiyel (m3/Ton)", width="medium"),
-                "Sozlesme_Tarihi": st.column_config.DateColumn("Sözleşme Tarihi", format="DD.MM.YYYY", width="medium"),
-                "Hatirlatici_Tarih": st.column_config.DateColumn("🔔 Hatırlatıcı", format="DD.MM.YYYY", min_value=date.today(), width="medium"),
-                "Notlar": st.column_config.TextColumn("Görüşme Notları", width="large"),
-                
-                "Telefon": None, "Adres": None # Gizle
+                "Durum": st.column_config.SelectboxColumn("Durum", options=["Yeni", "📞 Arandı", "✅ Anlaşıldı", "❌ Olumsuz"]),
+                "Sozlesme_Tarihi": st.column_config.DateColumn("Sözleşme", format="DD.MM.YYYY"),
+                "Hatirlatici_Tarih": st.column_config.DateColumn("🔔 Hatırlat", format="DD.MM.YYYY", min_value=date.today()),
+                "Telefon": None, "Adres": None
             },
             hide_index=True,
             use_container_width=True
@@ -326,15 +300,14 @@ elif secim == "📂 Portföy & İşlemler":
         with c1:
             if st.button("🗑️ SİL"):
                 kalan = edited_crm[edited_crm["Sil"]==False].drop(columns=["Sil", "WhatsApp", "Ara", "Yol_Tarifi"])
-                if len(edited_crm) > len(kalan):
-                    veriyi_kaydet(kalan)
-                    st.rerun()
+                veriyi_kaydet(kalan)
+                st.rerun()
         with c2:
-            if st.button("💾 GÜNCELLE", type="primary"):
-                kayit_df = edited_crm.drop(columns=["Sil", "WhatsApp", "Ara", "Yol_Tarifi"], errors='ignore')
-                veriyi_kaydet(kayit_df)
-                st.toast("Veriler güncellendi ve yedeklendi!", icon="💾")
+            if st.button("💾 GÜNCELLE (Bulut)", type="primary"):
+                kayit = edited_crm.drop(columns=["Sil", "WhatsApp", "Ara", "Yol_Tarifi"], errors='ignore')
+                veriyi_kaydet(kayit)
+                st.toast("Google Sheets Güncellendi!", icon="✅")
                 time.sleep(1)
                 st.rerun()
     else:
-        st.info("Listeniz boş.")
+        st.info("Portföy boş. Arama sayfasından ekleme yapın.")
