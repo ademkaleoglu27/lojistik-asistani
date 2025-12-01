@@ -240,4 +240,101 @@ elif selected == "Müşterilerim":
                     yeni_web = st.text_input("Web Sitesi", value=secilen_veri['Web'])
                     yeni_adres = st.text_area("Adres", value=secilen_veri['Adres'], height=80)
                 with c2:
-                    durum_listesi = ["Yeni",
+                    durum_listesi = ["Yeni", "📞 Arandı", "⏳ Teklif Verildi", "✅ Anlaşıldı", "❌ Olumsuz"]
+                    try: m_idx = durum_listesi.index(secilen_veri['Durum'])
+                    except: m_idx = 0
+                    yeni_durum = st.selectbox("Durum", durum_listesi, index=m_idx)
+                    yeni_tuketim = st.text_input("Tüketim (m3/Ton)", value=secilen_veri.get('Tuketim_Bilgisi', ''))
+                    
+                    val_ziyaret = secilen_veri.get('Ziyaret_Tarihi')
+                    if pd.isna(val_ziyaret): val_ziyaret = None
+                    yeni_ziyaret = st.date_input("Son Ziyaret", value=val_ziyaret)
+                    
+                    val_hatirlat = secilen_veri.get('Hatirlatici_Tarih')
+                    if pd.isna(val_hatirlat): val_hatirlat = None
+                    yeni_hatirlat = st.date_input("🔔 Hatırlatma Tarihi", value=val_hatirlat)
+
+                yeni_not = st.text_area("Görüşme Notları", value=secilen_veri['Notlar'])
+                
+                # Aksiyon Butonları
+                col_b1, col_b2 = st.columns(2)
+                if arama_linki_yap(yeni_tel): col_b1.link_button("📞 Hemen Ara", arama_linki_yap(yeni_tel), use_container_width=True)
+                if whatsapp_linki_yap(yeni_tel): col_b2.link_button("💬 WhatsApp", whatsapp_linki_yap(yeni_tel), use_container_width=True)
+                
+                if st.form_submit_button("💾 Değişiklikleri Kaydet", type="primary", use_container_width=True):
+                    df.at[idx, 'Telefon'] = yeni_tel
+                    df.at[idx, 'Email'] = yeni_email
+                    df.at[idx, 'Web'] = yeni_web
+                    df.at[idx, 'Adres'] = yeni_adres
+                    df.at[idx, 'Durum'] = yeni_durum
+                    df.at[idx, 'Tuketim_Bilgisi'] = yeni_tuketim
+                    df.at[idx, 'Ziyaret_Tarihi'] = pd.to_datetime(yeni_ziyaret)
+                    df.at[idx, 'Hatirlatici_Tarih'] = pd.to_datetime(yeni_hatirlat)
+                    df.at[idx, 'Notlar'] = yeni_not
+                    veriyi_kaydet(df)
+                    st.toast("Güncellendi!", icon="✅")
+                    time.sleep(1)
+                    st.rerun()
+                    
+            if st.button("🗑️ Müşteriyi Sil", type="secondary", use_container_width=True):
+                df = df.drop(idx)
+                veriyi_kaydet(df)
+                st.success("Silindi.")
+                st.rerun()
+        else:
+            st.info("Listeniz boş.")
+
+    # B) YENİ MÜŞTERİ EKLEME
+    elif mode == "➕ Yeni Müşteri Ekle":
+        st.markdown("""<div class="customer-card"><h4>✨ Yeni Müşteri Kartı</h4></div>""", unsafe_allow_html=True)
+        
+        with st.form("yeni_ekle"):
+            firma_adi = st.text_input("🏢 Firma Adı (Zorunlu)")
+            c1, c2 = st.columns(2)
+            with c1:
+                tel = st.text_input("Telefon")
+                email = st.text_input("Email")
+                web = st.text_input("Web Sitesi")
+            with c2:
+                adres = st.text_area("Adres", height=100)
+                tuketim = st.text_input("Tüketim Bilgisi")
+            
+            notlar = st.text_area("Notlar")
+            
+            if st.form_submit_button("💾 Kaydet ve Listeye Ekle", type="primary", use_container_width=True):
+                if firma_adi:
+                    yeni_veri = {
+                        "Firma": firma_adi, "Telefon": tel, "Web": web, "Email": email,
+                        "Adres": adres, "Durum": "Yeni", "Notlar": notlar,
+                        "Tuketim_Bilgisi": tuketim,
+                        "Sozlesme_Tarihi": "", "Hatirlatici_Tarih": "", "Ziyaret_Tarihi": ""
+                    }
+                    df = pd.concat([df, pd.DataFrame([yeni_veri])], ignore_index=True)
+                    veriyi_kaydet(df)
+                    st.success(f"{firma_adi} başarıyla eklendi!")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("Lütfen Firma Adı giriniz.")
+
+# --- SAYFA 4: AJANDA ---
+elif selected == "Ajanda":
+    st.markdown("### 📅 Hatırlatıcılar")
+    df = veri_tabanini_yukle()
+    if not df.empty and "Hatirlatici_Tarih" in df.columns:
+        bugun = pd.Timestamp.now().normalize()
+        gelecek = df[(df["Hatirlatici_Tarih"] >= bugun) & (df["Durum"] != "✅ Anlaşıldı")].sort_values("Hatirlatici_Tarih")
+        if not gelecek.empty:
+            st.dataframe(gelecek[["Hatirlatici_Tarih", "Firma", "Notlar"]], column_config={"Hatirlatici_Tarih": st.column_config.DateColumn("Tarih", format="DD.MM.YYYY")}, hide_index=True, use_container_width=True)
+        else: st.success("İş yok.")
+
+# --- SAYFA 5: BİLDİRİMLER ---
+elif selected == "Bildirimler":
+    st.markdown("### 🔔 Acil Bildirimler")
+    df = veri_tabanini_yukle()
+    if not df.empty and "Hatirlatici_Tarih" in df.columns:
+        bugun = pd.Timestamp.now().normalize()
+        acil = df[(df["Hatirlatici_Tarih"] <= bugun) & (df["Durum"] != "✅ Anlaşıldı")]
+        if not acil.empty:
+            for i, r in acil.iterrows(): st.error(f"⚠️ **{r['Firma']}**: {r['Notlar']} (Tarih: {r['Hatirlatici_Tarih'].strftime('%d.%m.%Y')})")
+        else: st.info("Temiz.")
