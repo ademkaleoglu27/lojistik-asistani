@@ -22,7 +22,7 @@ st.set_page_config(
 # --- SABİTLER ---
 SHEET_ADI = "Lojistik_Verileri" # Google'da açtığın tablonun adı
 # API KEY (Harita için) - Secrets'dan da çekilebilir ama buraya yazalım
-API_KEY = "BURAYA_API_KEYINI_YAPISTIR" 
+API_KEY = "AIzaSyCw0bhZ2WTrZtThjgJBMsbjZ7IDh6QN0Og" 
 
 # --- ARAMA KATEGORİLERİ ---
 SEKTORLER = {
@@ -311,3 +311,4 @@ elif secim == "📂 Portföy (Kalıcı)":
                 st.rerun()
     else:
         st.info("Portföy boş. Arama sayfasından ekleme yapın.")
+
