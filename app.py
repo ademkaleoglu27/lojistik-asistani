@@ -64,20 +64,21 @@ def veri_tabanini_yukle():
         sheet = client.open(SHEET_ADI).sheet1
         data = sheet.get_all_records()
         
-        # YENİ SÜTUN EKLENDİ: Yetkili_Kisi
-        beklenen_sutunlar = ["Firma", "Yetkili_Kisi", "Telefon", "Web", "Email", "Adres", "Durum", "Notlar", "Sozlesme_Tarihi", "Hatirlatici_Tarih", "Hatirlatici_Saat", "Tuketim_Bilgisi", "Ziyaret_Tarihi"]
+        # YENİ SÜTUNLAR EKLENDİ: Arac_Sayisi, Firma_Sektoru, Konum_Linki
+        beklenen_sutunlar = ["Firma", "Yetkili_Kisi", "Telefon", "Web", "Email", "Adres", "Durum", "Notlar", 
+                             "Sozlesme_Tarihi", "Hatirlatici_Tarih", "Hatirlatici_Saat", 
+                             "Tuketim_Bilgisi", "Ziyaret_Tarihi", "Arac_Sayisi", "Firma_Sektoru", "Konum_Linki"]
         
         if not data:
             sheet.append_row(beklenen_sutunlar)
             return pd.DataFrame(columns=beklenen_sutunlar)
         df = pd.DataFrame(data)
         
-        # Eksik sütunları tamamla
         for col in beklenen_sutunlar:
             if col not in df.columns: df[col] = ""
         
         # Veri temizliği
-        text_cols = ["Notlar", "Telefon", "Yetkili_Kisi", "Tuketim_Bilgisi", "Firma", "Adres", "Durum", "Web", "Email", "Hatirlatici_Saat"]
+        text_cols = ["Notlar", "Telefon", "Yetkili_Kisi", "Tuketim_Bilgisi", "Firma", "Adres", "Durum", "Web", "Email", "Hatirlatici_Saat", "Arac_Sayisi", "Firma_Sektoru", "Konum_Linki"]
         for col in text_cols:
             if col in df.columns: df[col] = df[col].astype(str).replace("nan", "").replace("None", "")
             
@@ -85,15 +86,13 @@ def veri_tabanini_yukle():
         for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi", "Ziyaret_Tarihi"]:
             if col in df.columns: df[col] = pd.to_datetime(df[col], errors='coerce')
         return df
-    except: return pd.DataFrame(columns=["Firma", "Yetkili_Kisi", "Telefon", "Web", "Email", "Adres", "Durum", "Notlar", "Sozlesme_Tarihi", "Hatirlatici_Tarih", "Hatirlatici_Saat", "Tuketim_Bilgisi", "Ziyaret_Tarihi"])
+    except: return pd.DataFrame(columns=["Firma", "Yetkili_Kisi", "Telefon", "Web", "Email", "Adres", "Durum", "Notlar", "Sozlesme_Tarihi", "Hatirlatici_Tarih", "Hatirlatici_Saat", "Tuketim_Bilgisi", "Ziyaret_Tarihi", "Arac_Sayisi", "Firma_Sektoru", "Konum_Linki"])
 
 def veriyi_kaydet(df):
     try:
         client = get_google_sheet_client()
         sheet = client.open(SHEET_ADI).sheet1
         df_save = df.copy()
-        
-        # Tarihleri string yap
         for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi", "Ziyaret_Tarihi"]:
             if col in df_save.columns:
                 df_save[col] = pd.to_datetime(df_save[col], errors='coerce').dt.strftime('%Y-%m-%d')
@@ -127,14 +126,38 @@ def arama_linki_yap(telefon):
     if pd.isna(telefon) or len(str(telefon)) < 5: return None
     return f"tel:{telefon}"
 
+# NAVİGASYON LİNKİ (GELİŞMİŞ)
+def navigasyon_linki_yap(adres, konum_linki):
+    if konum_linki and len(str(konum_linki)) > 5:
+        return str(konum_linki) # Direkt link varsa onu kullan
+    if pd.isna(adres) or not adres: return None
+    safe_address = urllib.parse.quote(str(adres))
+    return f"https://www.google.com/maps/dir/?api=1&destination={safe_address}"
+
+# TAKVİM LİNKİ (BİLDİRİM İÇİN)
+def takvime_ekle_linki(baslik, tarih, saat, aciklama):
+    if not tarih: return None
+    try:
+        # Tarih ve saati birleştir
+        start_dt = datetime.combine(tarih, datetime.strptime(saat, "%H:%M").time())
+        end_dt = start_dt + timedelta(hours=1)
+        
+        # Google Calendar Formatı: YYYYMMDDTHHMMSSZ
+        fmt = "%Y%m%dT%H%M%S"
+        dates = f"{start_dt.strftime(fmt)}/{end_dt.strftime(fmt)}"
+        
+        base = "https://www.google.com/calendar/render?action=TEMPLATE"
+        return f"{base}&text={urllib.parse.quote(baslik)}&dates={dates}&details={urllib.parse.quote(aciklama)}"
+    except: return None
+
 def detay_getir(place_id):
     url = "https://maps.googleapis.com/maps/api/place/details/json"
-    params = {'place_id': place_id, 'fields': 'formatted_phone_number,website', 'key': API_KEY}
+    params = {'place_id': place_id, 'fields': 'formatted_phone_number,website,url', 'key': API_KEY}
     try:
         res = requests.get(url, params=params).json()
         r = res.get('result', {})
-        return r.get('formatted_phone_number', ''), r.get('website', '')
-    except: return "", ""
+        return r.get('formatted_phone_number', ''), r.get('website', ''), r.get('url', '') # url=Google Maps Linki
+    except: return "", "", ""
 
 # --- ÜST MENÜ ---
 st.image("https://upload.wikimedia.org/wikipedia/commons/2/2e/Petrol_Ofisi_logo.svg", width=120)
@@ -192,10 +215,12 @@ elif selected == "Firma Bul":
                         resp = requests.get(url, params=params).json()
                         results = resp.get('results', [])
                         for f in results:
-                            tel, web = detay_getir(f.get('place_id'))
+                            tel, web, harita_url = detay_getir(f.get('place_id'))
                             tum_firmalar.append({
                                 "Firma": f.get('name'), "Yetkili_Kisi": "", "Telefon": tel, "Web": web, "Email": "",
-                                "Adres": f.get('formatted_address'), "Durum": "Yeni", "Notlar": "", "Tuketim_Bilgisi": "",
+                                "Adres": f.get('formatted_address'), "Durum": "Yeni", "Notlar": "", 
+                                "Tuketim_Bilgisi": "", "Arac_Sayisi": "", "Firma_Sektoru": sektor_key,
+                                "Konum_Linki": harita_url, # Google Maps Linkini Otomatik Kaydet
                                 "lat": f.get('geometry', {}).get('location', {}).get('lat'),
                                 "lon": f.get('geometry', {}).get('location', {}).get('lon')
                             })
@@ -248,12 +273,13 @@ elif selected == "Müşterilerim":
             with st.form("musteri_duzenle"):
                 c1, c2 = st.columns(2)
                 with c1:
-                    # YENİ ALAN: YETKİLİ KİŞİ
-                    yeni_yetkili = st.text_input("👤 Yetkili İsim Soyisim", value=secilen_veri.get('Yetkili_Kisi', ''))
+                    yeni_yetkili = st.text_input("👤 Yetkili İsim", value=secilen_veri.get('Yetkili_Kisi', ''))
                     yeni_tel = st.text_input("Telefon", value=secilen_veri['Telefon'])
                     yeni_email = st.text_input("Email", value=secilen_veri['Email'])
-                    yeni_web = st.text_input("Web Sitesi", value=secilen_veri['Web'])
-                    yeni_adres = st.text_area("Adres", value=secilen_veri['Adres'], height=80)
+                    # YENİ ALANLAR
+                    yeni_arac = st.text_input("🚛 Araç Sayısı", value=secilen_veri.get('Arac_Sayisi', ''))
+                    yeni_sektor = st.text_input("🏭 Sektör", value=secilen_veri.get('Firma_Sektoru', ''))
+                    
                 with c2:
                     durum_listesi = ["Yeni", "📞 Arandı", "⏳ Teklif Verildi", "✅ Anlaşıldı", "❌ Olumsuz"]
                     try: m_idx = durum_listesi.index(secilen_veri['Durum'])
@@ -261,10 +287,8 @@ elif selected == "Müşterilerim":
                     yeni_durum = st.selectbox("Durum", durum_listesi, index=m_idx)
                     yeni_tuketim = st.text_input("Tüketim (m3/Ton)", value=secilen_veri.get('Tuketim_Bilgisi', ''))
                     
-                    # Randevu
-                    st.write("📅 **Randevu / Hatırlatma**")
+                    st.write("🗓️ **Randevu & Bildirim**")
                     col_date, col_time = st.columns(2)
-                    
                     val_hatirlat_tar = secilen_veri.get('Hatirlatici_Tarih')
                     if pd.isna(val_hatirlat_tar): val_hatirlat_tar = None
                     yeni_hatirlat_tar = col_date.date_input("Tarih", value=val_hatirlat_tar)
@@ -275,20 +299,38 @@ elif selected == "Müşterilerim":
                     except: time_obj = datetime.strptime('09:00', '%H:%M').time()
                     yeni_hatirlat_saat = col_time.time_input("Saat", value=time_obj)
 
+                yeni_adres = st.text_area("Adres", value=secilen_veri['Adres'], height=60)
+                yeni_konum = st.text_input("📍 Konum (Google Maps Linki)", value=secilen_veri.get('Konum_Linki', ''))
                 yeni_not = st.text_area("Görüşme Notları", value=secilen_veri['Notlar'])
                 
-                col_b1, col_b2 = st.columns(2)
-                if arama_linki_yap(yeni_tel): col_b1.link_button("📞 Ara", arama_linki_yap(yeni_tel), use_container_width=True)
-                if whatsapp_linki_yap(yeni_tel): col_b2.link_button("💬 WhatsApp", whatsapp_linki_yap(yeni_tel), use_container_width=True)
+                # AKILLI AKSİYON BUTONLARI
+                col_b1, col_b2, col_b3, col_b4 = st.columns(4)
                 
+                # Arama
+                if arama_linki_yap(yeni_tel): col_b1.link_button("📞 Ara", arama_linki_yap(yeni_tel), use_container_width=True)
+                
+                # WhatsApp
+                if whatsapp_linki_yap(yeni_tel): col_b2.link_button("💬 WP", whatsapp_linki_yap(yeni_tel), use_container_width=True)
+                
+                # Navigasyon (Önce Linke Bakar, Yoksa Adrese)
+                nav_link = navigasyon_linki_yap(yeni_adres, yeni_konum)
+                if nav_link: col_b3.link_button("🗺️ Yol Tarifi", nav_link, use_container_width=True)
+                
+                # Takvim (Bildirim)
+                cal_link = takvime_ekle_linki(f"Görüşme: {secilen_veri['Firma']}", yeni_hatirlat_tar, yeni_hatirlat_saat.strftime('%H:%M'), yeni_not)
+                if cal_link: col_b4.link_button("📅 Takvime Ekle", cal_link, use_container_width=True)
+                
+                st.markdown("---")
                 if st.form_submit_button("💾 Değişiklikleri Kaydet", type="primary", use_container_width=True):
-                    df.at[idx, 'Yetkili_Kisi'] = yeni_yetkili # Kaydet
+                    df.at[idx, 'Yetkili_Kisi'] = yeni_yetkili
                     df.at[idx, 'Telefon'] = yeni_tel
                     df.at[idx, 'Email'] = yeni_email
-                    df.at[idx, 'Web'] = yeni_web
                     df.at[idx, 'Adres'] = yeni_adres
                     df.at[idx, 'Durum'] = yeni_durum
                     df.at[idx, 'Tuketim_Bilgisi'] = yeni_tuketim
+                    df.at[idx, 'Arac_Sayisi'] = yeni_arac
+                    df.at[idx, 'Firma_Sektoru'] = yeni_sektor
+                    df.at[idx, 'Konum_Linki'] = yeni_konum
                     df.at[idx, 'Hatirlatici_Tarih'] = pd.to_datetime(yeni_hatirlat_tar)
                     df.at[idx, 'Hatirlatici_Saat'] = yeni_hatirlat_saat.strftime('%H:%M')
                     df.at[idx, 'Notlar'] = yeni_not
@@ -313,77 +355,18 @@ elif selected == "Müşterilerim":
             firma_adi = st.text_input("🏢 Firma Adı (Zorunlu)")
             c1, c2 = st.columns(2)
             with c1:
-                # YENİ ALAN: YETKİLİ KİŞİ
-                yetkili = st.text_input("👤 Yetkili İsim Soyisim")
+                yetkili = st.text_input("👤 Yetkili İsim")
                 tel = st.text_input("Telefon")
                 email = st.text_input("Email")
+                sektor = st.text_input("🏭 Sektör")
             with c2:
                 adres = st.text_area("Adres", height=100)
                 tuketim = st.text_input("Tüketim Bilgisi")
+                arac = st.text_input("🚛 Araç Sayısı")
+            
+            konum_link = st.text_input("📍 Konum (Google Maps Linki)")
             
             st.markdown("---")
             st.write("📅 **Randevu Planla**")
             col_d, col_t = st.columns(2)
-            yeni_tar = col_d.date_input("Tarih", value=None)
-            yeni_saat = col_t.time_input("Saat", value=None)
-            
-            notlar = st.text_area("Notlar")
-            
-            if st.form_submit_button("💾 Kaydet", type="primary", use_container_width=True):
-                if firma_adi:
-                    hatirlat_str = yeni_tar.strftime('%Y-%m-%d') if yeni_tar else ""
-                    saat_str = yeni_saat.strftime('%H:%M') if yeni_saat else ""
-                    
-                    yeni_veri = {
-                        "Firma": firma_adi, "Yetkili_Kisi": yetkili, "Telefon": tel, "Web": "", "Email": email,
-                        "Adres": adres, "Durum": "Yeni", "Notlar": notlar,
-                        "Tuketim_Bilgisi": tuketim,
-                        "Sozlesme_Tarihi": "", "Hatirlatici_Tarih": hatirlat_str, 
-                        "Hatirlatici_Saat": saat_str, "Ziyaret_Tarihi": ""
-                    }
-                    df = pd.concat([df, pd.DataFrame([yeni_veri])], ignore_index=True)
-                    veriyi_kaydet(df)
-                    st.success(f"{firma_adi} başarıyla eklendi!")
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    st.error("Firma Adı zorunludur.")
-
-# --- SAYFA 4: AJANDA ---
-elif selected == "Ajanda":
-    st.markdown("### 📅 Ajanda & Randevular")
-    df = veri_tabanini_yukle()
-    if not df.empty and "Hatirlatici_Tarih" in df.columns:
-        bugun = pd.Timestamp.now().normalize()
-        gelecek = df[(df["Hatirlatici_Tarih"] >= bugun) & (df["Durum"] != "✅ Anlaşıldı")].copy()
-        
-        if not gelecek.empty:
-            gelecek = gelecek.sort_values(by=["Hatirlatici_Tarih", "Hatirlatici_Saat"])
-            st.info("Yaklaşan Görüşmeleriniz:")
-            
-            # Yetkili Kişi de ajandada görünsün
-            st.dataframe(
-                gelecek[["Hatirlatici_Tarih", "Hatirlatici_Saat", "Firma", "Yetkili_Kisi", "Notlar"]],
-                column_config={
-                    "Hatirlatici_Tarih": st.column_config.DateColumn("Tarih", format="DD.MM.YYYY"),
-                    "Hatirlatici_Saat": st.column_config.TextColumn("Saat"),
-                    "Yetkili_Kisi": st.column_config.TextColumn("Yetkili"),
-                    "Notlar": st.column_config.TextColumn("Konu", width="large"),
-                },
-                hide_index=True, use_container_width=True
-            )
-        else: st.success("Planlanmış bir görüşmeniz yok.")
-
-# --- SAYFA 5: BİLDİRİMLER ---
-elif selected == "Bildirimler":
-    st.markdown("### 🔔 Acil Bildirimler")
-    df = veri_tabanini_yukle()
-    if not df.empty and "Hatirlatici_Tarih" in df.columns:
-        bugun = pd.Timestamp.now().normalize()
-        acil = df[(df["Hatirlatici_Tarih"] <= bugun) & (df["Durum"] != "✅ Anlaşıldı")]
-        if not acil.empty:
-            for i, r in acil.iterrows(): 
-                saat_bilgisi = f" - ⏰ {r.get('Hatirlatici_Saat', '')}" if r.get('Hatirlatici_Saat') else ""
-                yetkili_bilgisi = f" (Yetkili: {r.get('Yetkili_Kisi', '-')})" if r.get('Yetkili_Kisi') else ""
-                st.error(f"⚠️ **{r['Firma']}**{yetkili_bilgisi}: {r['Notlar']} (Tarih: {r['Hatirlatici_Tarih'].strftime('%d.%m.%Y')}{saat_bilgisi})")
-        else: st.info("Temiz.")
+            yeni_tar = col_d.date_input("Tarih", value=
