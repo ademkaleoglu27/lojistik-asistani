@@ -414,4 +414,28 @@ with tab_musteri:
                 else: st.error("Firma Adı zorunlu.")
 
 # --- TAB 4: AJANDA ---
-with tab_ajanda
+with tab_ajanda:
+    st.markdown("### 📅 Randevular")
+    df = veri_tabanini_yukle()
+    if not df.empty and "Hatirlatici_Tarih" in df.columns:
+        bugun = pd.Timestamp.now().normalize()
+        gelecek = df[(df["Hatirlatici_Tarih"] >= bugun) & (df["Durum"] != "✅ Anlaşıldı")].copy()
+        if not gelecek.empty:
+            gelecek = gelecek.sort_values(by=["Hatirlatici_Tarih", "Hatirlatici_Saat"])
+            st.dataframe(gelecek[["Hatirlatici_Tarih", "Hatirlatici_Saat", "Firma", "Yetkili_Kisi", "Notlar"]], 
+                         column_config={"Hatirlatici_Tarih": st.column_config.DateColumn("Tarih", format="DD.MM.YYYY")}, 
+                         hide_index=True, use_container_width=True)
+        else: st.success("Gelecek randevu yok.")
+
+# --- TAB 5: UYARI ---
+with tab_bildirim:
+    st.markdown("### 🔔 Acil İşler")
+    df = veri_tabanini_yukle()
+    if not df.empty and "Hatirlatici_Tarih" in df.columns:
+        bugun = pd.Timestamp.now().normalize()
+        acil = df[(df["Hatirlatici_Tarih"] <= bugun) & (df["Durum"] != "✅ Anlaşıldı")]
+        if not acil.empty:
+            for i, r in acil.iterrows(): 
+                saat = f"⏰ {r.get('Hatirlatici_Saat', '')}" if r.get('Hatirlatici_Saat') else ""
+                st.error(f"⚠️ **{r['Firma']}**: {r['Notlar']} ({saat})")
+        else: st.info("Temiz.")
