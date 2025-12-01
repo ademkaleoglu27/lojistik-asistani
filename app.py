@@ -10,28 +10,28 @@ from bs4 import BeautifulSoup
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# --- 1. SAYFA AYARLARI ---
+# --- 1. SAYFA VE TASARIM AYARLARI ---
 st.set_page_config(
-    page_title="Lojistik Pro",
-    page_icon="🚚",
+    page_title="PO Saha Yönetim", # İsim Güncellendi
+    page_icon="⛽", 
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# --- 2. PREMIUM CSS TASARIMI ---
+# --- 2. ÖZEL CSS (PO KURUMSAL KIRMIZI/GRİ) ---
 def local_css():
     st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         
         html, body, [class*="css"] {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6; /* Modern Gri Arkaplan */
+            background-color: #f4f4f5;
         }
         
-        /* Üst Başlık Şeridi */
+        /* Üst Başlık - Petrol Ofisi Kırmızısı */
         .top-header {
-            background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+            background: linear-gradient(90deg, #d71920 0%, #a31218 100%);
             padding: 1.5rem;
             border-radius: 0 0 15px 15px;
             color: white;
@@ -42,12 +42,12 @@ def local_css():
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         
-        /* İstatistik Kartları */
+        /* Kartlar */
         .stat-card {
             background-color: white;
             padding: 20px;
             border-radius: 12px;
-            border-left: 5px solid #3b82f6;
+            border-left: 5px solid #d71920; /* PO Kırmızısı */
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             text-align: center;
         }
@@ -63,15 +63,12 @@ def local_css():
             letter-spacing: 1px;
         }
         
-        /* Tablo ve Butonlar */
+        /* Butonlar */
         .stButton>button {
             border-radius: 8px;
             font-weight: 600;
             height: 45px;
             transition: all 0.2s;
-        }
-        .stButton>button:hover {
-            transform: scale(1.02);
         }
         
         /* Gizli Elemanlar */
@@ -162,8 +159,8 @@ def siteyi_tara_mail_bul(website_url):
 
 def mail_linki_yap(email, firma_adi):
     if not email or "@" not in str(email): return None
-    konu = urllib.parse.quote(f"{firma_adi} - İş Birliği")
-    icerik = urllib.parse.quote(f"Merhaba,\n\nFirmanızla lojistik/servis süreçlerinde çalışmak isteriz.\n\nSaygılar.")
+    konu = urllib.parse.quote(f"{firma_adi} - Yakıt/Lojistik Çözümleri")
+    icerik = urllib.parse.quote(f"Sayın {firma_adi} Yetkilisi,\n\nPetrol Ofisi güvencesiyle lojistik operasyonlarınızda çözüm ortağınız olmak isteriz.\n\nSaygılarımla.")
     return f"mailto:{email}?subject={konu}&body={icerik}"
 
 def whatsapp_linki_yap(telefon):
@@ -187,10 +184,9 @@ def detay_getir(place_id):
         return r.get('formatted_phone_number', ''), r.get('website', '')
     except: return "", ""
 
-# --- ARAYÜZ BAŞLANGICI ---
-
-# Üst Başlık (Custom HTML)
-st.markdown('<div class="top-header">🚛 Lojistik Asistanı <br><span style="font-size:1rem; opacity:0.8;">Saha Satış Yönetim Paneli</span></div>', unsafe_allow_html=True)
+# --- ARAYÜZ ---
+# Özel PO Başlığı
+st.markdown('<div class="top-header">⛽ Petrol Ofisi <br><span style="font-size:1rem; opacity:0.9;">Saha Satış Yönetim Paneli</span></div>', unsafe_allow_html=True)
 
 # Sekmeler
 tab_home, tab_search, tab_crm = st.tabs(["📊 DASHBOARD", "🔎 FİRMA ARA", "💼 PORTFÖY"])
@@ -199,7 +195,7 @@ tab_home, tab_search, tab_crm = st.tabs(["📊 DASHBOARD", "🔎 FİRMA ARA", "�
 with tab_home:
     df = veri_tabanini_yukle()
     
-    # Custom Kartlar
+    # Kartlar
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown(f"""<div class="stat-card"><div class="stat-number">{len(df)}</div><div class="stat-label">Toplam Kayıt</div></div>""", unsafe_allow_html=True)
@@ -210,16 +206,16 @@ with tab_home:
         basari = len(df[df["Durum"] == "✅ Anlaşıldı"])
         st.markdown(f"""<div class="stat-card" style="border-left-color: #10b981;"><div class="stat-number">{basari}</div><div class="stat-label">Başarılı</div></div>""", unsafe_allow_html=True)
     
-    st.write("") # Boşluk
+    st.write("")
     
-    # Grafikler ve Uyarılar
+    # Grafikler
     g1, g2 = st.columns([1, 1.5])
     with g1:
         if not df.empty:
-            st.subheader("📈 Durum Analizi")
+            st.subheader("📈 Performans")
             durum_counts = df["Durum"].value_counts().reset_index()
             durum_counts.columns = ["Durum", "Adet"]
-            fig = px.pie(durum_counts, values="Adet", names="Durum", hole=0.5, color_discrete_sequence=px.colors.qualitative.Set2)
+            fig = px.pie(durum_counts, values="Adet", names="Durum", hole=0.5, color_discrete_sequence=px.colors.qualitative.Bold)
             fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
             st.plotly_chart(fig, use_container_width=True)
             
@@ -233,22 +229,20 @@ with tab_home:
                 for i, row in isler.iterrows():
                     st.info(f"📞 **{row['Firma']}**: {row['Notlar']}")
             else:
-                st.success("✅ Bugün için acil bir işiniz yok. Sahaya çıkabilirsiniz!")
+                st.success("✅ Bugün için acil bir işiniz yok.")
 
 # --- TAB 2: ARAMA ---
 with tab_search:
     with st.container():
-        st.write("#### 🎯 Hedef Belirle")
         c_city, c_cat, c_btn = st.columns([1.5, 1.5, 1])
         sehir = c_city.text_input("Şehir", "Gaziantep", label_visibility="collapsed", placeholder="Şehir Giriniz")
         sektor_key = c_cat.selectbox("Sektör", list(SEKTORLER.keys()), label_visibility="collapsed")
-        if c_btn.button("🔍 Firmaları Bul", type="primary", use_container_width=True):
+        if c_btn.button("🔍 Tara", type="primary", use_container_width=True):
             st.session_state['arama_basladi'] = True
     
     if st.session_state.get('arama_basladi'):
         arama_sorgusu = SEKTORLER[sektor_key]
         
-        # Sonuçlar daha önce çekilmediyse çek
         if 'sonuclar' not in st.session_state or st.session_state.get('last_city') != sehir:
             st.session_state['last_city'] = sehir
             tum_firmalar = []
@@ -285,11 +279,9 @@ with tab_search:
             else:
                 st.error("Sonuç bulunamadı.")
 
-    # Sonuç Listesi
     if 'sonuclar' in st.session_state:
         df_res = st.session_state['sonuclar']
         
-        # Harita Butonu
         if st.toggle("🗺️ Haritayı Göster"):
             st.map(df_res.dropna(subset=['lat','lon']), latitude='lat', longitude='lon', color='#ff0000')
         
@@ -301,7 +293,6 @@ with tab_search:
                 "Seç": st.column_config.CheckboxColumn("Ekle", width="small", default=False),
                 "Firma": st.column_config.TextColumn("Firma", disabled=True),
                 "Web": st.column_config.LinkColumn("Web"),
-                "Telefon": st.column_config.TextColumn("Telefon", disabled=True),
             },
             hide_index=True, use_container_width=True
         )
@@ -327,13 +318,11 @@ with tab_crm:
     if not df_crm.empty:
         if "Sil" not in df_crm.columns: df_crm.insert(0, "Sil", False)
         
-        # Linkleri Hazırla
         df_crm["WhatsApp"] = df_crm["Telefon"].apply(whatsapp_linki_yap)
         df_crm["Ara"] = df_crm["Telefon"].apply(arama_linki_yap)
         if "Email" not in df_crm.columns: df_crm["Email"] = ""
         df_crm["Mail_At"] = df_crm.apply(lambda x: mail_linki_yap(x.get("Email", ""), x.get("Firma", "")), axis=1)
         
-        # Editör
         edited_crm = st.data_editor(
             df_crm,
             column_config={
@@ -345,13 +334,11 @@ with tab_crm:
                 "Durum": st.column_config.SelectboxColumn("Durum", options=["Yeni", "📞 Arandı", "✅ Anlaşıldı", "❌ Olumsuz", "⏳ Teklif Verildi"], width="medium"),
                 "Hatirlatici_Tarih": st.column_config.DateColumn("🔔 Tarih", format="DD.MM.YYYY", min_value=date.today()),
                 "Web": st.column_config.LinkColumn("Web"),
-                "Email": st.column_config.TextColumn("Email"),
                 "Telefon": None, "Adres": None
             },
             hide_index=True, use_container_width=True
         )
         
-        # Balon Efekti (Yeni Anlaşma Varsa)
         if not df.empty and len(edited_crm[edited_crm["Durum"] == "✅ Anlaşıldı"]) > len(df[df["Durum"] == "✅ Anlaşıldı"]):
             st.balloons()
             st.toast("Tebrikler! Yeni bir anlaşma yaptınız! 🎉", icon="🔥")
@@ -369,17 +356,21 @@ with tab_crm:
             time.sleep(1)
             st.rerun()
     else:
-        st.info("Portföyünüz boş. Arama yaparak başlayın.")
+        st.info("Portföyünüz boş.")
 
-# --- YAN MENÜ (LOGO VE EKSTRALAR) ---
+# --- YAN MENÜ (LOGO VE BUTONLAR) ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2830/2830305.png", width=80) # Lojistik İkonu
+    # Petrol Ofisi Logosu (Veya temsili ikon)
+    st.image("https://upload.wikimedia.org/wikipedia/commons/2/2e/Petrol_Ofisi_logo.svg", width=180)
+    
+    st.write("")
+    # ÖZEL FİYAT LİNK BUTONU (Direkt akaryakıt fiyatları sayfasına gider)
+    st.link_button("⛽ GÜNCEL YAKIT FİYATLARI", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", use_container_width=True)
+    
+    st.markdown("---")
     st.write("### Hızlı Araçlar")
-    with st.expander("📝 Mesaj Şablonları"):
-        st.code("Merhaba, [Firma] adına yazıyorum. Lojistik süreçleriniz için tanışmak isteriz.", language="text")
-        st.code("Sayın Yetkili, talep ettiğiniz güzergah fiyatı ektedir.", language="text")
     
     # Rapor İndir
     if not df_crm.empty:
         csv = df_crm.to_csv(index=False).encode('utf-8')
-        st.download_button("📊 Excel İndir", csv, "Rapor.csv", "text/csv", use_container_width=True)
+        st.download_button("📊 Rapor İndir", csv, "PO_Saha_Raporu.csv", "text/csv", use_container_width=True)
