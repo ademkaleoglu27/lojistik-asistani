@@ -189,3 +189,4 @@ def detay_getir(place_id):
         r = res.get('result', {})
         return r.get('formatted_phone_number', ''), r.get('website', ''), r.get('url', '')
     except: return
+# test
