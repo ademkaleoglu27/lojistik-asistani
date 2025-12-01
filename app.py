@@ -16,7 +16,7 @@ st.set_page_config(
     page_title="PO Saha",
     page_icon="⛽", 
     layout="wide",
-    initial_sidebar_state="collapsed" # Yan menüyü gizliyoruz, üst menü kullanacağız
+    initial_sidebar_state="collapsed"
 )
 
 # --- 2. CSS TASARIMI ---
@@ -28,10 +28,7 @@ def local_css():
         .customer-card { background-color: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-top: 5px solid #e30613; margin-bottom: 20px; }
         .kpi-box { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; border: 1px solid #e5e7eb; }
         .stButton>button { border-radius: 8px; height: 45px; font-weight: 600; }
-        
-        /* Menü Stili */
         .nav-link-selected { background-color: #e30613 !important; }
-        
         #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -126,15 +123,15 @@ def detay_getir(place_id):
         return r.get('formatted_phone_number', ''), r.get('website', '')
     except: return "", ""
 
-# --- ÜST MENÜ (YATAY) ---
+# --- ÜST MENÜ ---
 st.image("https://upload.wikimedia.org/wikipedia/commons/2/2e/Petrol_Ofisi_logo.svg", width=120)
 
 selected = option_menu(
-    menu_title=None, # Başlık yok, ikonlar var
+    menu_title=None,
     options=["Pano", "Firma Bul", "Müşterilerim", "Ajanda", "Bildirimler"],
     icons=["house", "search", "people", "calendar", "bell"],
     default_index=0,
-    orientation="horizontal", # YATAY MOD (MOBİL İÇİN KRİTİK)
+    orientation="horizontal",
     styles={
         "container": {"padding": "0!important", "background-color": "#fafafa"},
         "icon": {"color": "black", "font-size": "14px"}, 
@@ -146,17 +143,12 @@ selected = option_menu(
 # --- SAYFA 1: PANO ---
 if selected == "Pano":
     st.markdown("### 📊 Bölge Durum Özeti")
-    
-    # Hızlı Fiyat Butonu
     st.link_button("⛽ Güncel Fiyatlar", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
-    
     df = veri_tabanini_yukle()
-    
     c1, c2, c3 = st.columns(3)
     c1.markdown(f"""<div class="kpi-box"><h3>{len(df)}</h3><small>Toplam</small></div>""", unsafe_allow_html=True)
     c2.markdown(f"""<div class="kpi-box" style="border-bottom: 4px solid #f59e0b;"><h3>{len(df[df["Durum"] == "Yeni"])}</h3><small>Bekleyen</small></div>""", unsafe_allow_html=True)
     c3.markdown(f"""<div class="kpi-box" style="border-bottom: 4px solid #10b981;"><h3>{len(df[df["Durum"] == "✅ Anlaşıldı"])}</h3><small>Anlaşılan</small></div>""", unsafe_allow_html=True)
-    
     st.write("")
     if not df.empty:
         durum_counts = df["Durum"].value_counts().reset_index()
@@ -172,16 +164,13 @@ elif selected == "Firma Bul":
         c1, c2 = st.columns(2)
         sehir = c1.text_input("Şehir", "Gaziantep", placeholder="Şehir")
         sektor_key = c2.selectbox("Sektör", list(SEKTORLER.keys()))
-        
         if st.button("🚀 Taramayı Başlat", type="primary", use_container_width=True):
             arama_sorgusu = SEKTORLER[sektor_key]
             st.toast("Veriler çekiliyor...", icon="⏳")
-            
             tum_firmalar = []
             next_page_token = None
             sayfa = 0
-            
-            with st.status("Google Haritalar taranıyor...", expanded=True):
+            with st.status("Haritalar taranıyor...", expanded=True):
                 while sayfa < 3:
                     url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
                     params = {'query': f"{sehir} {arama_sorgusu}", 'key': API_KEY, 'language': 'tr'}
@@ -193,7 +182,7 @@ elif selected == "Firma Bul":
                             tel, web = detay_getir(f.get('place_id'))
                             tum_firmalar.append({
                                 "Firma": f.get('name'), "Telefon": tel, "Web": web, "Email": "",
-                                "Adres": f.get('formatted_address'), "Durum": "Yeni", "Notlar": "",
+                                "Adres": f.get('formatted_address'), "Durum": "Yeni", "Notlar": "", "Tuketim_Bilgisi": "",
                                 "lat": f.get('geometry', {}).get('location', {}).get('lat'),
                                 "lon": f.get('geometry', {}).get('location', {}).get('lon')
                             })
@@ -201,7 +190,6 @@ elif selected == "Firma Bul":
                         sayfa += 1
                         if not next_page_token: break
                     except: break
-            
             if tum_firmalar:
                 df_res = pd.DataFrame(tum_firmalar)
                 df_res.insert(0, "Seç", False)
@@ -225,78 +213,31 @@ elif selected == "Firma Bul":
                 st.success(f"✅ {len(secilenler)} firma eklendi!")
                 time.sleep(1)
 
-# --- SAYFA 3: MÜŞTERİLERİM ---
+# --- SAYFA 3: MÜŞTERİLERİM (YENİ SİSTEM) ---
 elif selected == "Müşterilerim":
     st.markdown("### 👥 Müşteri Portföyü")
     df = veri_tabanini_yukle()
-    if not df.empty:
-        arama_terimi = st.selectbox("📂 Müşteri Seçin:", df["Firma"].tolist())
-        secilen_veri = df[df["Firma"] == arama_terimi].iloc[0]
-        idx = df[df["Firma"] == arama_terimi].index[0]
-        
-        st.markdown(f"""<div class="customer-card"><h4>🏢 {secilen_veri['Firma']}</h4></div>""", unsafe_allow_html=True)
-        with st.form("musteri_karti"):
-            c1, c2 = st.columns(2)
-            with c1:
-                st.caption("📞 İletişim")
-                yeni_tel = st.text_input("Telefon", value=secilen_veri['Telefon'])
-                yeni_email = st.text_input("Email", value=secilen_veri['Email'])
-                yeni_web = st.text_input("Web Sitesi", value=secilen_veri['Web'])
-            with c2:
-                st.caption("📊 Durum & Detay")
-                durum_listesi = ["Yeni", "📞 Arandı", "⏳ Teklif Verildi", "✅ Anlaşıldı", "❌ Olumsuz"]
-                try: m_idx = durum_listesi.index(secilen_veri['Durum'])
-                except: m_idx = 0
-                yeni_durum = st.selectbox("Durum", durum_listesi, index=m_idx)
-                yeni_tuketim = st.text_input("Tüketim (m3/Ton)", value=secilen_veri.get('Tuketim_Bilgisi', ''))
-                val_ziyaret = secilen_veri.get('Ziyaret_Tarihi')
-                if pd.isna(val_ziyaret): val_ziyaret = None
-                yeni_ziyaret = st.date_input("Son Ziyaret", value=val_ziyaret)
-            st.markdown("---")
-            yeni_not = st.text_area("Görüşme Notları", value=secilen_veri['Notlar'], height=100)
+    
+    # 1. MOD SEÇİMİ (MEVCUT MU, YENİ Mİ?)
+    mode = st.radio("İşlem Seçiniz:", ["📂 Mevcut Müşteriyi Düzenle", "➕ Yeni Müşteri Ekle"], horizontal=True)
+    
+    st.markdown("---")
+    
+    # A) MEVCUT MÜŞTERİ DÜZENLEME
+    if mode == "📂 Mevcut Müşteriyi Düzenle":
+        if not df.empty:
+            arama_terimi = st.selectbox("Müşteri Seçin:", df["Firma"].tolist())
+            secilen_veri = df[df["Firma"] == arama_terimi].iloc[0]
+            idx = df[df["Firma"] == arama_terimi].index[0]
             
-            col_b1, col_b2 = st.columns(2)
-            if arama_linki_yap(yeni_tel): col_b1.link_button("📞 Hemen Ara", arama_linki_yap(yeni_tel), use_container_width=True)
-            if whatsapp_linki_yap(yeni_tel): col_b2.link_button("💬 WhatsApp", whatsapp_linki_yap(yeni_tel), use_container_width=True)
+            st.markdown(f"""<div class="customer-card"><h4>🏢 {secilen_veri['Firma']}</h4></div>""", unsafe_allow_html=True)
             
-            st.markdown("---")
-            if st.form_submit_button("💾 Değişiklikleri Kaydet", type="primary", use_container_width=True):
-                df.at[idx, 'Telefon'] = yeni_tel
-                df.at[idx, 'Email'] = yeni_email
-                df.at[idx, 'Web'] = yeni_web
-                df.at[idx, 'Durum'] = yeni_durum
-                df.at[idx, 'Tuketim_Bilgisi'] = yeni_tuketim
-                df.at[idx, 'Ziyaret_Tarihi'] = pd.to_datetime(yeni_ziyaret)
-                df.at[idx, 'Notlar'] = yeni_not
-                veriyi_kaydet(df)
-                st.toast("Güncellendi!", icon="✅")
-                time.sleep(1)
-                st.rerun()
-        if st.button("🗑️ Sil", type="secondary"):
-            df = df.drop(idx)
-            veriyi_kaydet(df)
-            st.success("Silindi.")
-            st.rerun()
-    else: st.info("Portföy boş.")
-
-# --- SAYFA 4: AJANDA ---
-elif selected == "Ajanda":
-    st.markdown("### 📅 Hatırlatıcılar")
-    df = veri_tabanini_yukle()
-    if not df.empty and "Hatirlatici_Tarih" in df.columns:
-        bugun = pd.Timestamp.now().normalize()
-        gelecek = df[(df["Hatirlatici_Tarih"] >= bugun) & (df["Durum"] != "✅ Anlaşıldı")].sort_values("Hatirlatici_Tarih")
-        if not gelecek.empty:
-            st.dataframe(gelecek[["Hatirlatici_Tarih", "Firma", "Notlar"]], column_config={"Hatirlatici_Tarih": st.column_config.DateColumn("Tarih", format="DD.MM.YYYY")}, hide_index=True, use_container_width=True)
-        else: st.success("İş yok.")
-
-# --- SAYFA 5: BİLDİRİMLER ---
-elif selected == "Bildirimler":
-    st.markdown("### 🔔 Acil Bildirimler")
-    df = veri_tabanini_yukle()
-    if not df.empty and "Hatirlatici_Tarih" in df.columns:
-        bugun = pd.Timestamp.now().normalize()
-        acil = df[(df["Hatirlatici_Tarih"] <= bugun) & (df["Durum"] != "✅ Anlaşıldı")]
-        if not acil.empty:
-            for i, r in acil.iterrows(): st.error(f"⚠️ **{r['Firma']}**: {r['Notlar']} (Tarih: {r['Hatirlatici_Tarih'].strftime('%d.%m.%Y')})")
-        else: st.info("Temiz.")
+            with st.form("musteri_duzenle"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    yeni_tel = st.text_input("Telefon", value=secilen_veri['Telefon'])
+                    yeni_email = st.text_input("Email", value=secilen_veri['Email'])
+                    yeni_web = st.text_input("Web Sitesi", value=secilen_veri['Web'])
+                    yeni_adres = st.text_area("Adres", value=secilen_veri['Adres'], height=80)
+                with c2:
+                    durum_listesi = ["Yeni",
