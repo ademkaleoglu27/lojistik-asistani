@@ -132,14 +132,15 @@ def veriyi_kaydet(df):
         sheet = client.open(SHEET_ADI).sheet1
         df_save = df.copy()
         
-        # NaN Temizliği
-        df_save = df_save.fillna("") 
-        
-        # --- HATA DÜZELTME BURADA ---
-        # Tarihleri önce zorla tarihe çevir, sonra string yap
+        # 1. Tarihleri düzgün formata çevir
         for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi"]:
             if col in df_save.columns:
-                df_save[col] = pd.to_datetime(df_save[col], errors='coerce').dt.strftime('%Y-%m-%d').replace("NaT", "")
+                df_save[col] = pd.to_datetime(df_save[col], errors='coerce').dt.strftime('%Y-%m-%d')
+        
+        # 2. KRİTİK NOKTA: Her şeyi önce yazıya (string) çevir, sonra "nan" yazılarını temizle
+        # Bu işlem JSON hatasını %100 önler.
+        df_save = df_save.astype(str)
+        df_save = df_save.replace("nan", "").replace("NaT", "").replace("None", "").replace("<NA>", "")
         
         sheet.clear()
         sheet.update([df_save.columns.values.tolist()] + df_save.values.tolist())
