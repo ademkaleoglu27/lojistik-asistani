@@ -9,14 +9,14 @@ import plotly.express as px
 from bs4 import BeautifulSoup
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from streamlit_option_menu import option_menu # YENİ MENÜ KÜTÜPHANESİ
+from streamlit_option_menu import option_menu
 
 # --- 1. SAYFA AYARLARI ---
 st.set_page_config(
     page_title="PO Saha",
     page_icon="⛽", 
     layout="wide",
-    initial_sidebar_state="expanded" # ARTIK MENÜ HEP AÇIK
+    initial_sidebar_state="collapsed" # Yan menüyü gizliyoruz, üst menü kullanacağız
 )
 
 # --- 2. CSS TASARIMI ---
@@ -28,6 +28,10 @@ def local_css():
         .customer-card { background-color: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-top: 5px solid #e30613; margin-bottom: 20px; }
         .kpi-box { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; border: 1px solid #e5e7eb; }
         .stButton>button { border-radius: 8px; height: 45px; font-weight: 600; }
+        
+        /* Menü Stili */
+        .nav-link-selected { background-color: #e30613 !important; }
+        
         #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -122,57 +126,62 @@ def detay_getir(place_id):
         return r.get('formatted_phone_number', ''), r.get('website', '')
     except: return "", ""
 
-# --- YAN MENÜ (PROFESYONEL) ---
-with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/2/2e/Petrol_Ofisi_logo.svg", width=160)
-    
-    # ŞIK MENÜ (Option Menu)
-    selected = option_menu(
-        menu_title="Ana Menü",
-        options=["Pano", "Firma Bul", "Müşterilerim", "Ajanda", "Bildirimler"],
-        icons=["house", "search", "people", "calendar", "bell"],
-        menu_icon="cast",
-        default_index=0,
-        styles={
-            "container": {"padding": "0!important", "background-color": "#fafafa"},
-            "icon": {"color": "black", "font-size": "18px"}, 
-            "nav-link": {"font-size": "16px", "text-align": "left", "margin":"0px", "--hover-color": "#eee"},
-            "nav-link-selected": {"background-color": "#e30613"}, # PO Kırmızısı
-        }
-    )
-    
-    st.markdown("---")
-    st.link_button("⛽ Güncel Fiyatlar", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", use_container_width=True)
+# --- ÜST MENÜ (YATAY) ---
+st.image("https://upload.wikimedia.org/wikipedia/commons/2/2e/Petrol_Ofisi_logo.svg", width=120)
+
+selected = option_menu(
+    menu_title=None, # Başlık yok, ikonlar var
+    options=["Pano", "Firma Bul", "Müşterilerim", "Ajanda", "Bildirimler"],
+    icons=["house", "search", "people", "calendar", "bell"],
+    default_index=0,
+    orientation="horizontal", # YATAY MOD (MOBİL İÇİN KRİTİK)
+    styles={
+        "container": {"padding": "0!important", "background-color": "#fafafa"},
+        "icon": {"color": "black", "font-size": "14px"}, 
+        "nav-link": {"font-size": "12px", "text-align": "center", "margin":"0px", "--hover-color": "#eee"},
+        "nav-link-selected": {"background-color": "#e30613", "color": "white"},
+    }
+)
 
 # --- SAYFA 1: PANO ---
 if selected == "Pano":
-    st.title("📊 Bölge Durum Özeti")
+    st.markdown("### 📊 Bölge Durum Özeti")
+    
+    # Hızlı Fiyat Butonu
+    st.link_button("⛽ Güncel Fiyatlar", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
+    
     df = veri_tabanini_yukle()
+    
     c1, c2, c3 = st.columns(3)
-    c1.markdown(f"""<div class="kpi-box"><h3>{len(df)}</h3><p>Toplam Müşteri</p></div>""", unsafe_allow_html=True)
-    c2.markdown(f"""<div class="kpi-box" style="border-bottom: 4px solid #f59e0b;"><h3>{len(df[df["Durum"] == "Yeni"])}</h3><p>Bekleyen</p></div>""", unsafe_allow_html=True)
-    c3.markdown(f"""<div class="kpi-box" style="border-bottom: 4px solid #10b981;"><h3>{len(df[df["Durum"] == "✅ Anlaşıldı"])}</h3><p>Anlaşılan</p></div>""", unsafe_allow_html=True)
+    c1.markdown(f"""<div class="kpi-box"><h3>{len(df)}</h3><small>Toplam</small></div>""", unsafe_allow_html=True)
+    c2.markdown(f"""<div class="kpi-box" style="border-bottom: 4px solid #f59e0b;"><h3>{len(df[df["Durum"] == "Yeni"])}</h3><small>Bekleyen</small></div>""", unsafe_allow_html=True)
+    c3.markdown(f"""<div class="kpi-box" style="border-bottom: 4px solid #10b981;"><h3>{len(df[df["Durum"] == "✅ Anlaşıldı"])}</h3><small>Anlaşılan</small></div>""", unsafe_allow_html=True)
+    
     st.write("")
     if not df.empty:
         durum_counts = df["Durum"].value_counts().reset_index()
         durum_counts.columns = ["Durum", "Adet"]
         fig = px.pie(durum_counts, values="Adet", names="Durum", hole=0.6, color_discrete_sequence=px.colors.qualitative.Bold)
+        fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250)
         st.plotly_chart(fig, use_container_width=True)
 
 # --- SAYFA 2: FİRMA BUL ---
 elif selected == "Firma Bul":
-    st.title("🗺️ Hedef Pazar Analizi")
+    st.markdown("### 🗺️ Hedef Pazar Analizi")
     with st.container():
         c1, c2 = st.columns(2)
         sehir = c1.text_input("Şehir", "Gaziantep", placeholder="Şehir")
         sektor_key = c2.selectbox("Sektör", list(SEKTORLER.keys()))
+        
         if st.button("🚀 Taramayı Başlat", type="primary", use_container_width=True):
             arama_sorgusu = SEKTORLER[sektor_key]
-            st.toast("Çekiliyor...", icon="⏳")
+            st.toast("Veriler çekiliyor...", icon="⏳")
+            
             tum_firmalar = []
             next_page_token = None
             sayfa = 0
-            with st.status("Haritalar taranıyor...", expanded=True):
+            
+            with st.status("Google Haritalar taranıyor...", expanded=True):
                 while sayfa < 3:
                     url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
                     params = {'query': f"{sehir} {arama_sorgusu}", 'key': API_KEY, 'language': 'tr'}
@@ -192,11 +201,12 @@ elif selected == "Firma Bul":
                         sayfa += 1
                         if not next_page_token: break
                     except: break
+            
             if tum_firmalar:
                 df_res = pd.DataFrame(tum_firmalar)
                 df_res.insert(0, "Seç", False)
                 st.session_state['sonuclar'] = df_res
-            else: st.error("Sonuç yok.")
+            else: st.error("Sonuç bulunamadı.")
 
     if 'sonuclar' in st.session_state:
         df_res = st.session_state['sonuclar']
@@ -217,7 +227,7 @@ elif selected == "Firma Bul":
 
 # --- SAYFA 3: MÜŞTERİLERİM ---
 elif selected == "Müşterilerim":
-    st.title("👥 Müşteri Portföyü")
+    st.markdown("### 👥 Müşteri Portföyü")
     df = veri_tabanini_yukle()
     if not df.empty:
         arama_terimi = st.selectbox("📂 Müşteri Seçin:", df["Firma"].tolist())
@@ -245,13 +255,12 @@ elif selected == "Müşterilerim":
             st.markdown("---")
             yeni_not = st.text_area("Görüşme Notları", value=secilen_veri['Notlar'], height=100)
             
-            # Linkler
             col_b1, col_b2 = st.columns(2)
-            if arama_linki_yap(yeni_tel): col_b1.link_button("📞 Ara", arama_linki_yap(yeni_tel), use_container_width=True)
+            if arama_linki_yap(yeni_tel): col_b1.link_button("📞 Hemen Ara", arama_linki_yap(yeni_tel), use_container_width=True)
             if whatsapp_linki_yap(yeni_tel): col_b2.link_button("💬 WhatsApp", whatsapp_linki_yap(yeni_tel), use_container_width=True)
             
             st.markdown("---")
-            if st.form_submit_button("💾 Kaydet", type="primary", use_container_width=True):
+            if st.form_submit_button("💾 Değişiklikleri Kaydet", type="primary", use_container_width=True):
                 df.at[idx, 'Telefon'] = yeni_tel
                 df.at[idx, 'Email'] = yeni_email
                 df.at[idx, 'Web'] = yeni_web
@@ -272,7 +281,7 @@ elif selected == "Müşterilerim":
 
 # --- SAYFA 4: AJANDA ---
 elif selected == "Ajanda":
-    st.title("📅 Hatırlatıcılar")
+    st.markdown("### 📅 Hatırlatıcılar")
     df = veri_tabanini_yukle()
     if not df.empty and "Hatirlatici_Tarih" in df.columns:
         bugun = pd.Timestamp.now().normalize()
@@ -283,7 +292,7 @@ elif selected == "Ajanda":
 
 # --- SAYFA 5: BİLDİRİMLER ---
 elif selected == "Bildirimler":
-    st.title("🔔 Acil Bildirimler")
+    st.markdown("### 🔔 Acil Bildirimler")
     df = veri_tabanini_yukle()
     if not df.empty and "Hatirlatici_Tarih" in df.columns:
         bugun = pd.Timestamp.now().normalize()
