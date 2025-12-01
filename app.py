@@ -64,7 +64,7 @@ local_css()
 # --- SABİTLER ---
 SHEET_ADI = "Lojistik_Verileri"
 # Kendi API Anahtarını buraya yapıştır:
-API_KEY = "BURAYA_API_KEYINI_YAPISTIR" 
+API_KEY = "AIzaSyCw0bhZ2WTrZtThjgJBMsbjZ7IDh6QN0Og" 
 
 # --- ARAMA KATEGORİLERİ ---
 SEKTORLER = {
@@ -128,3 +128,4 @@ def veriyi_kaydet(df):
         client = get_google_sheet_client()
         sheet = client.open(SHEET_ADI).sheet1
         df_save = df.copy()
+
