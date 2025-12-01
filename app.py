@@ -345,4 +345,74 @@ elif selected == "Müşterilerim":
     elif mode == "➕ Yeni Ekle":
         st.markdown("""<div class="customer-card"><h4>✨ Yeni Müşteri Kartı</h4></div>""", unsafe_allow_html=True)
         with st.form("yeni_ekle"):
-            firma_adi = st.text_input("🏢 Firma Ad
+            firma_adi = st.text_input("🏢 Firma Adı (Zorunlu)")
+            c1, c2 = st.columns(2)
+            with c1:
+                yetkili = st.text_input("👤 Yetkili İsim")
+                tel = st.text_input("Telefon")
+                email = st.text_input("Email")
+                sektor = st.text_input("🏭 Sektör")
+            with c2:
+                adres = st.text_area("Adres", height=100)
+                tuketim = st.text_input("Tüketim Bilgisi")
+                arac = st.text_input("🚛 Araç Sayısı")
+            
+            konum_link = st.text_input("📍 Konum (Google Maps Linki)")
+            st.markdown("---")
+            st.write("📅 **Randevu Planla**")
+            col_d, col_t = st.columns(2)
+            yeni_tar = col_d.date_input("Tarih", value=None)
+            yeni_saat = col_t.time_input("Saat", value=None)
+            notlar = st.text_area("Notlar")
+            
+            kaydet_yeni = st.form_submit_button("💾 Kaydet", type="primary", use_container_width=True)
+        
+        # Form dışında işlem (Takvim linki için)
+        if kaydet_yeni:
+            if firma_adi:
+                hatirlat_str = yeni_tar.strftime('%Y-%m-%d') if yeni_tar else ""
+                saat_str = yeni_saat.strftime('%H:%M') if yeni_saat else ""
+                yeni_veri = {
+                    "Firma": firma_adi, "Yetkili_Kisi": yetkili, "Telefon": tel, "Web": "", "Email": email,
+                    "Adres": adres, "Durum": "Yeni", "Notlar": notlar,
+                    "Tuketim_Bilgisi": tuketim, "Arac_Sayisi": arac, "Firma_Sektoru": sektor, "Konum_Linki": konum_link,
+                    "Sozlesme_Tarihi": "", "Hatirlatici_Tarih": hatirlat_str, "Hatirlatici_Saat": saat_str, "Ziyaret_Tarihi": ""
+                }
+                df = pd.concat([df, pd.DataFrame([yeni_veri])], ignore_index=True)
+                veriyi_kaydet(df)
+                
+                st.markdown(f"""<div class="success-box">✅ {firma_adi} Eklendi!</div>""", unsafe_allow_html=True)
+                if yeni_tar:
+                    cal_link = google_calendar_link(f"PO Görüşme: {firma_adi}", yeni_tar, saat_str, adres, notlar)
+                    if cal_link:
+                        st.link_button("📅 👉 RANDEVUYU TAKVİME İŞLE (Alarm Kur)", cal_link, type="secondary", use_container_width=True)
+                time.sleep(4)
+                st.rerun()
+            else: st.error("Firma Adı zorunludur.")
+
+# --- SAYFA 4: AJANDA ---
+elif selected == "Ajanda":
+    st.markdown("### 📅 Ajanda & Randevular")
+    df = veri_tabanini_yukle()
+    if not df.empty and "Hatirlatici_Tarih" in df.columns:
+        bugun = pd.Timestamp.now().normalize()
+        gelecek = df[(df["Hatirlatici_Tarih"] >= bugun) & (df["Durum"] != "✅ Anlaşıldı")].copy()
+        if not gelecek.empty:
+            gelecek = gelecek.sort_values(by=["Hatirlatici_Tarih", "Hatirlatici_Saat"])
+            st.info("Yaklaşan Görüşmeleriniz:")
+            st.dataframe(gelecek[["Hatirlatici_Tarih", "Hatirlatici_Saat", "Firma", "Yetkili_Kisi", "Notlar"]], column_config={"Hatirlatici_Tarih": st.column_config.DateColumn("Tarih", format="DD.MM.YYYY"), "Hatirlatici_Saat": st.column_config.TextColumn("Saat"), "Yetkili_Kisi": st.column_config.TextColumn("Yetkili"), "Notlar": st.column_config.TextColumn("Konu", width="large")}, hide_index=True, use_container_width=True)
+        else: st.success("Planlanmış bir görüşmeniz yok.")
+
+# --- SAYFA 5: BİLDİRİMLER ---
+elif selected == "Bildirimler":
+    st.markdown("### 🔔 Acil Bildirimler")
+    df = veri_tabanini_yukle()
+    if not df.empty and "Hatirlatici_Tarih" in df.columns:
+        bugun = pd.Timestamp.now().normalize()
+        acil = df[(df["Hatirlatici_Tarih"] <= bugun) & (df["Durum"] != "✅ Anlaşıldı")]
+        if not acil.empty:
+            for i, r in acil.iterrows(): 
+                saat_bilgisi = f" - ⏰ {r.get('Hatirlatici_Saat', '')}" if r.get('Hatirlatici_Saat') else ""
+                yetkili_bilgisi = f" (Yetkili: {r.get('Yetkili_Kisi', '-')})" if r.get('Yetkili_Kisi') else ""
+                st.error(f"⚠️ **{r['Firma']}**{yetkili_bilgisi}: {r['Notlar']} (Tarih: {r['Hatirlatici_Tarih'].strftime('%d.%m.%Y')}{saat_bilgisi})")
+        else: st.info("Temiz.")
