@@ -105,15 +105,18 @@ def veri_tabanini_yukle():
             
         df = pd.DataFrame(data)
         
+        # Eksik sütunları tamamla
         for col in beklenen_sutunlar:
             if col not in df.columns:
                 df[col] = ""
         
+        # Veri tiplerini temizle
         text_cols = ["Notlar", "Telefon", "Tuketim_Bilgisi", "Firma", "Adres", "Durum", "Web", "Email"]
         for col in text_cols:
             if col in df.columns:
                 df[col] = df[col].astype(str).replace("nan", "").replace("None", "")
         
+        # Tarih formatları
         for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi"]:
             if col in df.columns:
                 df[col] = pd.to_datetime(df[col], errors='coerce')
@@ -129,14 +132,15 @@ def veriyi_kaydet(df):
         sheet = client.open(SHEET_ADI).sheet1
         df_save = df.copy()
         
+        # --- HATA ÇÖZÜMÜ: NaN (Bozuk Sayı) TEMİZLİĞİ ---
+        # Google Sheets'e göndermeden önce tüm boşlukları temiz metne çeviriyoruz
+        df_save = df_save.fillna("") 
+        
+        # Tarihleri string yap
         for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi"]:
             if col in df_save.columns:
                 df_save[col] = df_save[col].dt.strftime('%Y-%m-%d').replace("NaT", "")
         
-        for col in ["Web", "Email"]:
-            if col not in df_save.columns:
-                df_save[col] = ""
-                
         sheet.clear()
         sheet.update([df_save.columns.values.tolist()] + df_save.values.tolist())
         st.cache_data.clear()
@@ -164,10 +168,8 @@ def whatsapp_linki_yap(telefon):
     if pd.isna(telefon) or len(str(telefon)) < 5: return None
     temiz_no = re.sub(r'\D', '', str(telefon))
     if len(temiz_no) < 10: return None
-    if temiz_no.startswith("0"): 
-        temiz_no = "90" + temiz_no[1:]
-    elif not temiz_no.startswith("90") and len(temiz_no) == 10: 
-        temiz_no = "90" + temiz_no
+    if temiz_no.startswith("0"): temiz_no = "90" + temiz_no[1:]
+    elif not temiz_no.startswith("90") and len(temiz_no) == 10: temiz_no = "90" + temiz_no
     return f"https://wa.me/{temiz_no}"
 
 def arama_linki_yap(telefon):
@@ -270,6 +272,7 @@ with tab_search:
             secilenler = edited[edited["Seç"]==True].drop(columns=["Seç"], errors='ignore')
             if not secilenler.empty:
                 with st.spinner("Mail adresleri aranıyor ve kaydediliyor..."):
+                    # Mail bulma
                     for i, r in secilenler.iterrows():
                         if r["Web"] and len(r["Web"]) > 5:
                             secilenler.at[i, "Email"] = siteyi_tara_mail_bul(r["Web"])
@@ -291,7 +294,6 @@ with tab_crm:
         df_crm["WhatsApp"] = df_crm["Telefon"].apply(whatsapp_linki_yap)
         df_crm["Ara"] = df_crm["Telefon"].apply(arama_linki_yap)
         
-        # Email kontrolü ve lambda düzeltmesi
         if "Email" not in df_crm.columns: df_crm["Email"] = ""
         df_crm["Mail_At"] = df_crm.apply(lambda x: mail_linki_yap(x.get("Email", ""), x.get("Firma", "")), axis=1)
         
