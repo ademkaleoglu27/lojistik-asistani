@@ -132,14 +132,14 @@ def veriyi_kaydet(df):
         sheet = client.open(SHEET_ADI).sheet1
         df_save = df.copy()
         
-        # --- HATA ÇÖZÜMÜ: NaN (Bozuk Sayı) TEMİZLİĞİ ---
-        # Google Sheets'e göndermeden önce tüm boşlukları temiz metne çeviriyoruz
+        # NaN Temizliği
         df_save = df_save.fillna("") 
         
-        # Tarihleri string yap
+        # --- HATA DÜZELTME BURADA ---
+        # Tarihleri önce zorla tarihe çevir, sonra string yap
         for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi"]:
             if col in df_save.columns:
-                df_save[col] = df_save[col].dt.strftime('%Y-%m-%d').replace("NaT", "")
+                df_save[col] = pd.to_datetime(df_save[col], errors='coerce').dt.strftime('%Y-%m-%d').replace("NaT", "")
         
         sheet.clear()
         sheet.update([df_save.columns.values.tolist()] + df_save.values.tolist())
@@ -272,7 +272,6 @@ with tab_search:
             secilenler = edited[edited["Seç"]==True].drop(columns=["Seç"], errors='ignore')
             if not secilenler.empty:
                 with st.spinner("Mail adresleri aranıyor ve kaydediliyor..."):
-                    # Mail bulma
                     for i, r in secilenler.iterrows():
                         if r["Web"] and len(r["Web"]) > 5:
                             secilenler.at[i, "Email"] = siteyi_tara_mail_bul(r["Web"])
