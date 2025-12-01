@@ -13,7 +13,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(
-    page_title="Lojistik Pro (Bulut)", 
+    page_title="SATIŞ DESTEK", 
     page_icon="☁️", 
     layout="wide",
     initial_sidebar_state="expanded"
@@ -137,7 +137,7 @@ def detay_getir(place_id):
 
 # --- YAN MENÜ ---
 with st.sidebar:
-    st.title("🚛 Lojistik Asistanı")
+    st.title("SATIŞ DESTEK")
     st.caption("Bulut Versiyon v8.0")
     st.markdown("---")
     
@@ -311,4 +311,5 @@ elif secim == "📂 Portföy (Kalıcı)":
                 st.rerun()
     else:
         st.info("Portföy boş. Arama sayfasından ekleme yapın.")
+
 
