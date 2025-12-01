@@ -369,4 +369,65 @@ elif selected == "Müşterilerim":
             st.markdown("---")
             st.write("📅 **Randevu Planla**")
             col_d, col_t = st.columns(2)
-            yeni_tar = col_d.date_input("Tarih", value=
+            yeni_tar = col_d.date_input("Tarih", value=None)
+            yeni_saat = col_t.time_input("Saat", value=None)
+            
+            notlar = st.text_area("Notlar")
+            
+            if st.form_submit_button("💾 Kaydet", type="primary", use_container_width=True):
+                if firma_adi:
+                    hatirlat_str = yeni_tar.strftime('%Y-%m-%d') if yeni_tar else ""
+                    saat_str = yeni_saat.strftime('%H:%M') if yeni_saat else ""
+                    
+                    yeni_veri = {
+                        "Firma": firma_adi, "Yetkili_Kisi": yetkili, "Telefon": tel, "Web": "", "Email": email,
+                        "Adres": adres, "Durum": "Yeni", "Notlar": notlar,
+                        "Tuketim_Bilgisi": tuketim, "Arac_Sayisi": arac, "Firma_Sektoru": sektor,
+                        "Konum_Linki": konum_link,
+                        "Sozlesme_Tarihi": "", "Hatirlatici_Tarih": hatirlat_str, 
+                        "Hatirlatici_Saat": saat_str, "Ziyaret_Tarihi": ""
+                    }
+                    df = pd.concat([df, pd.DataFrame([yeni_veri])], ignore_index=True)
+                    veriyi_kaydet(df)
+                    st.success(f"{firma_adi} başarıyla eklendi!")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("Firma Adı zorunludur.")
+
+# --- SAYFA 4: AJANDA ---
+elif selected == "Ajanda":
+    st.markdown("### 📅 Ajanda & Randevular")
+    df = veri_tabanini_yukle()
+    if not df.empty and "Hatirlatici_Tarih" in df.columns:
+        bugun = pd.Timestamp.now().normalize()
+        gelecek = df[(df["Hatirlatici_Tarih"] >= bugun) & (df["Durum"] != "✅ Anlaşıldı")].copy()
+        
+        if not gelecek.empty:
+            gelecek = gelecek.sort_values(by=["Hatirlatici_Tarih", "Hatirlatici_Saat"])
+            st.info("Yaklaşan Görüşmeleriniz:")
+            st.dataframe(
+                gelecek[["Hatirlatici_Tarih", "Hatirlatici_Saat", "Firma", "Yetkili_Kisi", "Notlar"]],
+                column_config={
+                    "Hatirlatici_Tarih": st.column_config.DateColumn("Tarih", format="DD.MM.YYYY"),
+                    "Hatirlatici_Saat": st.column_config.TextColumn("Saat"),
+                    "Yetkili_Kisi": st.column_config.TextColumn("Yetkili"),
+                    "Notlar": st.column_config.TextColumn("Konu", width="large"),
+                },
+                hide_index=True, use_container_width=True
+            )
+        else: st.success("Planlanmış bir görüşmeniz yok.")
+
+# --- SAYFA 5: BİLDİRİMLER ---
+elif selected == "Bildirimler":
+    st.markdown("### 🔔 Acil Bildirimler")
+    df = veri_tabanini_yukle()
+    if not df.empty and "Hatirlatici_Tarih" in df.columns:
+        bugun = pd.Timestamp.now().normalize()
+        acil = df[(df["Hatirlatici_Tarih"] <= bugun) & (df["Durum"] != "✅ Anlaşıldı")]
+        if not acil.empty:
+            for i, r in acil.iterrows(): 
+                saat_bilgisi = f" - ⏰ {r.get('Hatirlatici_Saat', '')}" if r.get('Hatirlatici_Saat') else ""
+                yetkili_bilgisi = f" (Yetkili: {r.get('Yetkili_Kisi', '-')})" if r.get('Yetkili_Kisi') else ""
+                st.error(f"⚠️ **{r['Firma']}**{yetkili_bilgisi}: {r['Notlar']} (Tarih: {r['Hatirlatici_Tarih'].strftime('%d.%m.%Y')}{saat_bilgisi})")
+        else: st.info("Temiz.")
