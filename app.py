@@ -1,23 +1,3 @@
-Harika bir ekleme! CRM sisteminin en önemli parçalarından biri "Kiminle muhatap oldum?" bilgisidir.
-
-V19.0 (Yetkili Kişi Özellikli) sürümünü hazırladım.
-
-👤 Neler Eklendi?
-Yeni Kayıt Ekranı: "Firma Adı"nın hemen altına "Yetkili İsim Soyisim" kutucuğu geldi.
-
-Düzenleme Ekranı: Mevcut müşterilerin içine girip yetkili kişi ismini sonradan ekleyebilir veya değiştirebilirsin.
-
-Otomatik Sütun: Google E-Tablo'nda bu sütun yoksa bile kod otomatik olarak yaratacak, senin tabloyu elle düzeltmene gerek yok.
-
-Yapman Gereken:
-GitHub -> app.py -> Edit.
-
-Tüm kodu sil ve yapıştır.
-
-API Anahtarını girmeyi unutma!
-
-Python
-
 import streamlit as st
 import pandas as pd
 import requests
