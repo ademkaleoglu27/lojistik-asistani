@@ -357,4 +357,23 @@ elif selected == "Ajanda":
                 gelecek[["Hatirlatici_Tarih", "Hatirlatici_Saat", "Firma", "Notlar"]],
                 column_config={
                     "Hatirlatici_Tarih": st.column_config.DateColumn("Tarih", format="DD.MM.YYYY"),
-                    "Hatirlatici_Saat":
+                    "Hatirlatici_Saat": st.column_config.TextColumn("Saat"),
+                    "Firma": st.column_config.TextColumn("Firma", width="medium"),
+                    "Notlar": st.column_config.TextColumn("Konu/Not", width="large"),
+                },
+                hide_index=True, use_container_width=True
+            )
+        else: st.success("Planlanmış bir görüşmeniz yok.")
+
+# --- SAYFA 5: BİLDİRİMLER ---
+elif selected == "Bildirimler":
+    st.markdown("### 🔔 Acil Bildirimler")
+    df = veri_tabanini_yukle()
+    if not df.empty and "Hatirlatici_Tarih" in df.columns:
+        bugun = pd.Timestamp.now().normalize()
+        acil = df[(df["Hatirlatici_Tarih"] <= bugun) & (df["Durum"] != "✅ Anlaşıldı")]
+        if not acil.empty:
+            for i, r in acil.iterrows(): 
+                saat_bilgisi = f" - ⏰ {r.get('Hatirlatici_Saat', '')}" if r.get('Hatirlatici_Saat') else ""
+                st.error(f"⚠️ **{r['Firma']}**: {r['Notlar']} (Tarih: {r['Hatirlatici_Tarih'].strftime('%d.%m.%Y')}{saat_bilgisi})")
+        else: st.info("Temiz.")
