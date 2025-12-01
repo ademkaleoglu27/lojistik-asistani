@@ -18,7 +18,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. ÖZEL CSS (TASARIM) ---
+# --- 2. ÖZEL CSS ---
 def local_css():
     st.markdown("""
     <style>
@@ -63,8 +63,8 @@ local_css()
 
 # --- SABİTLER ---
 SHEET_ADI = "Lojistik_Verileri"
-# SENİN API ANAHTARIN:
-API_KEY = "AIzaSyCw0bhZ2WTrZtThjgJBMsbjZ7IDh6QN0Og"
+# Kendi API Anahtarını buraya yapıştır:
+API_KEY = "BURAYA_API_KEYINI_YAPISTIR" 
 
 # --- ARAMA KATEGORİLERİ ---
 SEKTORLER = {
@@ -90,14 +90,13 @@ def get_google_sheet_client():
     client = gspread.authorize(creds)
     return client
 
-@st.cache_data(ttl=10) # Önbellek süresini kısalttım (10sn)
+@st.cache_data(ttl=10)
 def veri_tabanini_yukle():
     try:
         client = get_google_sheet_client()
         sheet = client.open(SHEET_ADI).sheet1
         data = sheet.get_all_records()
         
-        # Sütun listesi (Olması gerekenler)
         beklenen_sutunlar = ["Firma", "Telefon", "Web", "Email", "Adres", "Durum", "Notlar", "Sozlesme_Tarihi", "Hatirlatici_Tarih"]
         
         if not data:
@@ -106,25 +105,21 @@ def veri_tabanini_yukle():
             
         df = pd.DataFrame(data)
         
-        # --- HATA ÇÖZÜMÜ: EKSİK SÜTUNLARI OTOMATİK EKLE ---
         for col in beklenen_sutunlar:
             if col not in df.columns:
-                df[col] = "" # Sütun yoksa boş olarak yarat
+                df[col] = ""
         
-        # Veri tiplerini temizle
         text_cols = ["Notlar", "Telefon", "Tuketim_Bilgisi", "Firma", "Adres", "Durum", "Web", "Email"]
         for col in text_cols:
             if col in df.columns:
                 df[col] = df[col].astype(str).replace("nan", "").replace("None", "")
         
-        # Tarih formatları
         for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi"]:
             if col in df.columns:
                 df[col] = pd.to_datetime(df[col], errors='coerce')
                 
         return df
     except Exception as e:
-        # Hata durumunda boş ama yapısı doğru bir tablo döndür ki uygulama çökmesin
         st.error(f"Veri yükleme hatası: {e}")
         return pd.DataFrame(columns=["Firma", "Telefon", "Web", "Email", "Adres", "Durum", "Notlar", "Sozlesme_Tarihi", "Hatirlatici_Tarih"])
 
@@ -133,43 +128,3 @@ def veriyi_kaydet(df):
         client = get_google_sheet_client()
         sheet = client.open(SHEET_ADI).sheet1
         df_save = df.copy()
-        
-        # Tarihleri string yap
-        for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi"]:
-            if col in df_save.columns:
-                df_save[col] = df_save[col].dt.strftime('%Y-%m-%d').replace("NaT", "")
-        
-        # Eksik sütunları (Web, Email vb.) kaydetmeden önce garantiye al
-        for col in ["Web", "Email"]:
-            if col not in df_save.columns:
-                df_save[col] = ""
-                
-        sheet.clear()
-        sheet.update([df_save.columns.values.tolist()] + df_save.values.tolist())
-        st.cache_data.clear()
-    except Exception as e:
-        st.error(f"Kayıt Hatası: {e}")
-
-# --- FONKSİYONLAR ---
-def siteyi_tara_mail_bul(website_url):
-    if not website_url or "http" not in website_url: return ""
-    try:
-        response = requests.get(website_url, timeout=3)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        mailler = set(re.findall(r"[a-z0-9\.\-+_]+@[a-z0-9\.\-+_]+\.[a-z]+", soup.text, re.I))
-        if mailler: return list(mailler)[0]
-    except: return ""
-    return ""
-
-def mail_linki_yap(email, firma_adi):
-    if not email or "@" not in str(email): return None
-    konu = urllib.parse.quote(f"{firma_adi} - İş Birliği")
-    icerik = urllib.parse.quote(f"Merhaba,\n\nFirmanızla lojistik/servis süreçlerinde çalışmak isteriz.\n\nSaygılar.")
-    return f"mailto:{email}?subject={konu}&body={icerik}"
-
-def whatsapp_linki_yap(telefon):
-    if pd.isna(telefon) or len(str(telefon)) < 5: return None
-    temiz_no = re.sub(r'\D', '', str(telefon))
-    if len(temiz_no) < 10: return None
-    if temiz_no.startswith("0"): temiz_no = "90" + temiz_no[1:]
-    elif not temiz_no.startswith("90") and len(temiz_no)
