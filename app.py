@@ -73,6 +73,7 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
+# ŞEHİR LİSTESİ
 SEHIRLER = [
     "Adana", "Adiyaman", "Afyonkarahisar", "Agri", "Amasya", "Ankara", "Antalya", "Artvin", "Aydin", "Balikesir", 
     "Bilecik", "Bingol", "Bitlis", "Bolu", "Burdur", "Bursa", "Canakkale", "Cankiri", "Corum", "Denizli", 
@@ -84,49 +85,46 @@ SEHIRLER = [
     "Kirikkale", "Batman", "Sirnak", "Bartin", "Ardahan", "Igdir", "Yalova", "Karabuk", "Kilis", "Osmaniye", "Duzce"
 ]
 
-# --- FİYAT ÇEKME MOTORU (V42.0 - GÜÇLENDİRİLMİŞ) ---
+# --- FİYAT ÇEKME MOTORU (DÜZELTİLDİ: İSİM HATASI GİDERİLDİ) ---
 def turkce_karakter_duzelt(text):
     text = text.lower()
-    replacements = {'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', ' ': '-'}
+    replacements = {'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', 'İ': 'i', 'Ğ': 'g', 'Ü': 'u', 'Ş': 's', 'Ö': 'o', 'Ç': 'c'}
     for src, target in replacements.items():
         text = text.replace(src, target)
     return text
 
-# Cache'i kaldırdık ki her seferinde taze çeksin
-def fiyat_cek_garanti(sehir):
-    """Döviz.com üzerinden motorin fiyatını çeker (Daha stabil)"""
+# Fonksiyon ismini eski haline getirdim ki kod çökmesin
+@st.cache_data(ttl=3600) 
+def fiyat_cek_po(sehir): 
+    """Haberler.com üzerinden fiyat çeker (Daha stabil)"""
     try:
         sehir_slug = turkce_karakter_duzelt(sehir)
-        url = f"https://kur.doviz.com/akaryakit-fiyatlari/{sehir_slug}"
+        url = f"https://www.haberler.com/akaryakit-fiyatlari/{sehir_slug}/"
         
-        # Gerçek bir tarayıcı gibi görün
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-        
+        headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers, timeout=5)
         
         if response.status_code == 200:
-            # Pandas ile sayfadaki tabloları oku
+            # Tabloları oku
             dfs = pd.read_html(response.content)
             
-            if dfs:
-                df = dfs[0] # Genelde ilk tablo fiyat tablosudur
-                # Tabloyu tara
-                for index, row in df.iterrows():
-                    # Satırın tamamını string yapıp "Motorin" kelimesini ara
-                    row_str = str(row.values).lower()
-                    if "motorin" in row_str:
-                        # O satırdaki sayıları bul
-                        for item in row:
-                            if isinstance(item, (int, float, str)):
-                                # Sayıya çevirmeyi dene
-                                clean_item = str(item).replace('TL', '').replace(',', '.').strip()
+            for df in dfs:
+                # Tabloda PO var mı bak
+                if "Petrol Ofisi" in str(df) or "PETROL OFİSİ" in str(df):
+                    for index, row in df.iterrows():
+                        row_str = str(row.values).lower()
+                        if "petrol ofisi" in row_str:
+                            # Satırdaki sayıları bul
+                            values = [str(x).replace('TL', '').replace(',', '.').strip() for x in row if isinstance(x, (int, float, str))]
+                            
+                            for val in values:
                                 try:
-                                    fiyat = float(clean_item)
-                                    if 35 < fiyat < 60: # Mantıklı fiyat aralığı
+                                    fiyat = float(val)
+                                    # Motorin fiyatı mantık aralığı (35-60 TL)
+                                    if 35 < fiyat < 60:
                                         return fiyat
-                                except: continue
+                                except:
+                                    continue
     except:
         pass
     
@@ -491,18 +489,17 @@ elif selected == "Teklif & Hesap":
     tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word Teklif Oluştur"])
     
     with tab_hesap:
-        # ŞEHİR SEÇİMİ VE OTOMATİK FİYAT
         col_sehir, col_bos = st.columns([2, 1])
         secilen_sehir = col_sehir.selectbox("🌍 Şehir Seç", SEHIRLER, index=SEHIRLER.index("Gaziantep"))
         
-        # Fiyatı Otomatik Çek
+        # Fiyatı çek (YENİLENMİŞ FONKSİYON İLE)
         oto_fiyat = 0.0
         with st.spinner("Fiyat alınıyor..."):
-            oto_fiyat = fiyat_cek_po(secilen_sehir)
+            oto_fiyat = fiyat_cek_po(secilen_sehir) # Fonksiyon adı artık eski, ama içi yeni
         
         if oto_fiyat == 0.0:
-            st.warning("⚠️ Otomatik fiyat çekilemedi. Lütfen manuel giriniz.")
-            oto_fiyat = 44.00 # Varsayılan
+            st.warning("⚠️ Fiyat otomatik çekilemedi. Lütfen manuel giriniz.")
+            oto_fiyat = 44.00 
         else:
             st.success(f"✅ {secilen_sehir}: {oto_fiyat} TL")
             
@@ -516,7 +513,6 @@ elif selected == "Teklif & Hesap":
         
         st.markdown("---")
         if aylik_litre > 0:
-            # HESAPLAMALAR
             indirimli_pompa = guncel_fiyat * (1 - (iskonto_orani/100))
             aylik_kazanc_pompa = (guncel_fiyat - indirimli_pompa) * aylik_litre
             yillik_kazanc_pompa = aylik_kazanc_pompa * 12
