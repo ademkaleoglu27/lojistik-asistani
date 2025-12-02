@@ -75,34 +75,46 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
-# ŞEHİRLER (PO URL Yapısına Uygun)
 SEHIRLER = [
-    "Adana", "Adiyaman", "Afyonkarahisar", "Agri", "Amasya", "Ankara", "Antalya", "Artvin", "Aydin", "Balikesir", "Bilecik", "Bingol", "Bitlis", "Bolu", "Burdur", "Bursa", "Canakkale", "Cankiri", "Corum", "Denizli", "Diyarbakir", "Edirne", "Elazig", "Erzincan", "Erzurum", "Eskisehir", "Gaziantep", "Giresun", "Gumushane", "Hakkari", "Hatay", "Isparta", "Mersin", "Istanbul", "Izmir", "Kars", "Kastamonu", "Kayseri", "Kirklareli", "Kirsehir", "Kocaeli", "Konya", "Kutahya", "Malatya", "Manisa", "Kahramanmaras", "Mardin", "Mugla", "Mus", "Nevsehir", "Nigde", "Ordu", "Rize", "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Tekirdag", "Tokat", "Trabzon", "Tunceli", "Sanliurfa", "Usak", "Van", "Yozgat", "Zonguldak", "Aksaray", "Bayburt", "Karaman", "Kirikkale", "Batman", "Sirnak", "Bartin", "Ardahan", "Igdir", "Yalova", "Karabuk", "Kilis", "Osmaniye", "Duzce"
+    "Adana", "Adiyaman", "Afyonkarahisar", "Agri", "Amasya", "Ankara", "Antalya", "Artvin", "Aydin", "Balikesir", 
+    "Bilecik", "Bingol", "Bitlis", "Bolu", "Burdur", "Bursa", "Canakkale", "Cankiri", "Corum", "Denizli", 
+    "Diyarbakir", "Edirne", "Elazig", "Erzincan", "Erzurum", "Eskisehir", "Gaziantep", "Giresun", "Gumushane", 
+    "Hakkari", "Hatay", "Isparta", "Mersin", "Istanbul", "Izmir", "Kars", "Kastamonu", "Kayseri", "Kirklareli", 
+    "Kirsehir", "Kocaeli", "Konya", "Kutahya", "Malatya", "Manisa", "Kahramanmaras", "Mardin", "Mugla", "Mus", 
+    "Nevsehir", "Nigde", "Ordu", "Rize", "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Tekirdag", "Tokat", 
+    "Trabzon", "Tunceli", "Sanliurfa", "Usak", "Van", "Yozgat", "Zonguldak", "Aksaray", "Bayburt", "Karaman", 
+    "Kirikkale", "Batman", "Sirnak", "Bartin", "Ardahan", "Igdir", "Yalova", "Karabuk", "Kilis", "Osmaniye", "Duzce"
 ]
 
-# --- CANLI FİYAT ÇEKME MOTORU ---
-def fiyat_cek_po(sehir_slug):
-    """Petrol Ofisi sitesinden V/Max Diesel fiyatını çeker"""
+# --- FİYAT ÇEKME MOTORU ---
+def turkce_karakter_duzelt(text):
+    text = text.lower()
+    replacements = {'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', ' ': '-'}
+    for src, target in replacements.items():
+        text = text.replace(src, target)
+    return text
+
+def fiyat_cek_po(sehir):
     try:
-        sehir_kucuk = sehir_slug.lower()
-        url = f"https://www.petrolofisi.com.tr/akaryakit-fiyatlari/{sehir_kucuk}"
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+        sehir_slug = turkce_karakter_duzelt(sehir)
+        url = f"https://www.petrolofisi.com.tr/akaryakit-fiyatlari/{sehir_slug}"
+        headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers, timeout=5)
-        
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, 'html.parser')
-            # Tabloyu bul ve 3. sütunu (Genelde Motorin) al
             table = soup.find('table')
             if table:
                 rows = table.find_all('tr')
-                for row in rows[1:]: 
-                    cols = row.find_all('td')
-                    if len(cols) > 2:
-                        fiyat_text = cols[2].text.strip()
-                        fiyat_temiz = fiyat_text.replace('TL', '').replace(',', '.').strip()
-                        return float(fiyat_temiz)
-    except:
-        pass
+                if len(rows) > 1:
+                    cols = rows[1].find_all('td')
+                    for col in cols:
+                        # Basit mantık: İçinde rakam ve virgül olan, 30-60 arası değeri al
+                        text = col.text.strip().replace('TL', '').replace(',', '.').strip()
+                        try:
+                            val = float(text)
+                            if 35 < val < 60: return val
+                        except: continue
+    except: pass
     return 0.0
 
 # --- WORD TEKLİF ---
@@ -238,7 +250,7 @@ st.write("")
 if selected == "Pano":
     tarih_str = datetime.now().strftime("%d %B %Y")
     st.markdown(f"""<div class="hero-card"><h3>👋 Merhaba, Müdürüm</h3><p>{tarih_str} | Saha Operasyon Paneli</p></div>""", unsafe_allow_html=True)
-    st.link_button("⛽ GÜNCEL AKARYAKIT FİYATLARI", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
+    st.link_button("⛽ GÜNCEL AKARYAKIT FİYATLARI (LİSTE)", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
     
     df = veri_tabanini_yukle()
     if not df.empty:
@@ -464,11 +476,11 @@ elif selected == "Teklif & Hesap":
     tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word Teklif Oluştur"])
     
     with tab_hesap:
-        # ŞEHİR VE OTOMATİK FİYAT
+        # ŞEHİR SEÇİMİ VE OTOMATİK FİYAT
         col_sehir, col_bos = st.columns([2, 1])
         secilen_sehir = col_sehir.selectbox("🌍 Şehir Seç", SEHIRLER, index=SEHIRLER.index("Gaziantep"))
         
-        # Fiyatı Otomatik Çek
+        # Fiyatı Otomatik Çek (Veya Manuel Gir)
         oto_fiyat = fiyat_cek_po(secilen_sehir)
         if oto_fiyat == 0.0: oto_fiyat = 44.0
         
