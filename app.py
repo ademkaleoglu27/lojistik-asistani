@@ -14,92 +14,30 @@ from docxtpl import DocxTemplate
 from fpdf import FPDF
 import io
 
-# --- 1. SAYFA AYARLARI ---
+# --- 1. SAYFA VE TASARIM AYARLARI ---
 st.set_page_config(
     page_title="Özkaraaslan Saha",
     page_icon="⛽", 
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded" # DÜZELTME: Menü artık açık başlayacak
 )
 
-# --- 2. TASARIM VE CSS (RESİMDEKİ GİBİ) ---
+# --- 2. CSS TASARIMI ---
 def local_css():
     st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+        html, body, [class*="css"] { font-family: 'Roboto', sans-serif; background-color: #f4f6f9; }
+        .hero-card { background: linear-gradient(135deg, #e30613 0%, #8a040b 100%); padding: 20px; border-radius: 15px; color: white; box-shadow: 0 8px 15px rgba(227, 6, 19, 0.2); margin-bottom: 20px; }
+        .kpi-container { background-color: white; padding: 10px; border-radius: 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-bottom: 3px solid #e30613; }
+        .kpi-val { font-size: 1.4rem; font-weight: 700; color: #1f2937; }
+        .stButton>button { border-radius: 8px; height: 45px; font-weight: 600; width: 100%; }
+        .nav-link-selected { background-color: #e30613 !important; }
+        .compare-box { padding: 20px; border-radius: 12px; text-align: center; color: #333; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .price-tag { font-size: 1.8rem; font-weight: 800; margin: 10px 0; }
         
-        html, body, [class*="css"] {
-            font-family: 'Inter', sans-serif;
-            background-color: #f8fafc; /* Çok açık gri-mavi */
-        }
-
-        /* --- SIDEBAR (SOL MENÜ) TASARIMI --- */
-        section[data-testid="stSidebar"] {
-            background-color: white;
-            border-right: 1px solid #e2e8f0;
-            padding-top: 0rem;
-        }
-        
-        /* LOGO VE BAŞLIK ALANI (KIRMIZI KUTULU) */
-        .brand-container {
-            display: flex;
-            align-items: center;
-            padding: 20px 10px;
-            margin-bottom: 20px;
-        }
-        .logo-box {
-            background-color: #e30613; /* PO Kırmızısı */
-            width: 45px;
-            height: 45px;
-            border-radius: 12px; /* Hafif yuvarlak köşe */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 24px;
-            margin-right: 12px;
-            box-shadow: 0 4px 6px rgba(227, 6, 19, 0.2);
-        }
-        .brand-text h3 {
-            margin: 0;
-            font-size: 16px;
-            font-weight: 700;
-            color: #0f172a;
-            line-height: 1.2;
-        }
-        .brand-text p {
-            margin: 0;
-            font-size: 12px;
-            color: #64748b;
-            font-weight: 500;
-        }
-
-        /* MENÜ STİLİ (RESİMDEKİ GİBİ SEÇİLİ HALİ) */
-        .nav-link {
-            font-weight: 500 !important;
-            color: #475569 !important; /* Gri yazı */
-            margin: 5px 0 !important;
-        }
-        .nav-link:hover {
-            background-color: #f1f5f9 !important;
-            color: #0f172a !important;
-        }
-        /* Seçili Olan Menü (Açık Kırmızı Zemin, Koyu Kırmızı Yazı) */
-        .nav-link-selected {
-            background-color: #fef2f2 !important; /* Çok açık kırmızı */
-            color: #e30613 !important; /* Koyu kırmızı yazı */
-            border-radius: 10px !important;
-            font-weight: 600 !important;
-        }
-
-        /* KARTLAR VE DİĞERLERİ */
-        .kpi-container { background: white; padding: 15px; border-radius: 16px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
-        .kpi-val { font-size: 1.5rem; font-weight: 700; color: #0f172a; }
-        .hero-card { background: white; padding: 20px; border-radius: 16px; border-left: 5px solid #e30613; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        
-        .stButton>button { border-radius: 10px; height: 45px; font-weight: 600; width: 100%; border:none; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        
-        #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+        /* Header görünür olsun ki mobilde menüyü açıp kapatabilesin */
+        #MainMenu {visibility: hidden;} footer {visibility: hidden;} 
     </style>
     """, unsafe_allow_html=True)
 local_css()
@@ -110,7 +48,7 @@ KULLANICI_ADI = "admin"
 SIFRE = "1234"
 
 def giris_ekrani():
-    st.markdown("<br><br><h2 style='text-align:center; color:#e30613;'>🔐 Giriş</h2>", unsafe_allow_html=True)
+    st.markdown("<br><br><h2 style='text-align:center; color:#e30613;'>🔐 Özkaraaslan Giriş</h2>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
         k = st.text_input("Kullanıcı")
@@ -129,6 +67,7 @@ if not st.session_state['giris_yapildi']:
 SHEET_ADI = "Lojistik_Verileri"
 API_KEY = "AIzaSyCw0bhZ2WTrZtThjgJBMsbjZ7IDh6QN0Og"
 SABLON_DOSYASI = "teklif_sablonu.docx" 
+LOGO_URL = "https://www.ozkaraaslanfilo.com/wp-content/uploads/2021/01/logo.png"
 
 SEKTORLER = {
     "🚛 Lojistik": "Lojistik Firmaları", "📦 Nakliye": "Yurt İçi Nakliye Firmaları", "🌍 Uluslararası": "Uluslararası Transport",
@@ -137,30 +76,31 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
-# --- FİYAT ÇEKME MOTORU ---
-def turkce_karakter_duzelt(text):
-    text = text.lower()
-    replacements = {'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c'}
-    for src, target in replacements.items(): text = text.replace(src, target)
-    return text
+# --- WORD TEKLİF ---
+def tr_upper(text):
+    if not text: return ""
+    return str(text).replace('i', 'İ').replace('ı', 'I').upper()
+
+def tr_title(text):
+    if not text: return ""
+    words = str(text).split()
+    return " ".join([w[0].replace('i','İ').replace('ı','I').upper() + w[1:].replace('I','ı').replace('İ','i').lower() for w in words if w])
 
 def tr_pdf(text):
     replacements = {'ğ':'g','Ğ':'G','ü':'u','Ü':'U','ş':'s','Ş':'S','ı':'i','İ':'I','ö':'o','Ö':'O','ç':'c','Ç':'C'}
     for k,v in replacements.items(): text = text.replace(k, v)
     return text
 
-def tr_upper(text): return str(text).replace('i', 'İ').replace('ı', 'I').upper() if text else ""
-def tr_title(text):
-    if not text: return ""
-    return " ".join([w[0].replace('i','İ').replace('ı','I').upper() + w[1:].replace('I','ı').replace('İ','i').lower() for w in str(text).split() if w])
-
 def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         doc = DocxTemplate(SABLON_DOSYASI)
         context = {
-            'firma_adi': tr_upper(firma_adi), 'yetkili': tr_title(yetkili),
-            'iskonto_pompa': f"% {iskonto_pompa}", 'iskonto_istasyon': f"% {iskonto_istasyon}",
-            'odeme_sekli': str(odeme_sekli), 'tarih': datetime.now().strftime("%d.%m.%Y")
+            'firma_adi': tr_upper(firma_adi), 
+            'yetkili': tr_title(yetkili),
+            'iskonto_pompa': f"% {iskonto_pompa}",       
+            'iskonto_istasyon': f"% {iskonto_istasyon}", 
+            'odeme_sekli': str(odeme_sekli), 
+            'tarih': datetime.now().strftime("%d.%m.%Y")
         }
         doc.render(context)
         bio = io.BytesIO()
@@ -168,11 +108,14 @@ def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli,
         return bio.getvalue()
     except: return None
 
+# --- PDF TEKLİF ---
 def pdf_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
+        try: pdf.image(LOGO_URL, x=10, y=8, w=50)
+        except: pass
         pdf.ln(20)
         pdf.set_font("Arial", 'B', 16)
         pdf.cell(0, 10, "YAKIT TEDARIK TEKLIFI", ln=True, align='C')
@@ -289,41 +232,29 @@ def detay_getir(place_id):
         return r.get('formatted_phone_number', ''), r.get('website', ''), r.get('url', '')
     except: return "", "", ""
 
-# --- SIDEBAR (SOL MENÜ - BOLT TASARIMI) ---
+# --- SIDEBAR (SOL MENÜ) ---
 with st.sidebar:
-    # Özel Marka Alanı (Resimdeki gibi)
-    st.markdown("""
-    <div class="brand-container">
-        <div class="logo-box">⛽</div>
-        <div class="brand-text">
-            <h3>Özkaraaslan</h3>
-            <p>Saha Operasyon</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.image(LOGO_URL, width=160)
+    st.markdown("### Saha Yönetim")
     
-    # Menü Seçenekleri (Resimdeki stiller CSS ile yapıldı)
     selected = option_menu(
         menu_title=None,
-        options=["Pano", "Firma Bul", "Müşteriler", "Teklif & Hesap", "Ajanda"],
-        icons=["bar-chart", "search", "people", "file-earmark-text", "calendar3"],
+        options=["Pano", "Firma Bul", "Müşteriler", "Teklif & Hesap", "Ajanda", "Bildirim"],
+        icons=["speedometer2", "search", "person-badge", "file-earmark-text", "calendar-week", "bell"],
         default_index=0,
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
-            "icon": {"color": "#64748b", "font-size": "16px"}, 
-            "nav-link": {"font-size": "14px", "text-align": "left", "margin":"0px", "--hover-color": "#f1f5f9"},
-            "nav-link-selected": {"background-color": "#fef2f2", "color": "#e30613"}, # Seçili: Açık Kırmızı Zemin + Koyu Kırmızı Yazı
+            "icon": {"color": "#e30613", "font-size": "16px"}, 
+            "nav-link": {"font-size": "15px", "text-align": "left", "margin":"5px", "--hover-color": "#eee"},
+            "nav-link-selected": {"background-color": "#e30613", "color": "white"},
         }
     )
-    
     st.markdown("---")
-    
-    # Çıkış Butonu (Alt Kısım)
     if st.button("🚪 Çıkış Yap", use_container_width=True, type="secondary"):
         st.session_state['giris_yapildi'] = False
         st.rerun()
 
-# --- İÇERİK ---
+# --- İÇERİK (Main Area) ---
 
 # --- PANO ---
 if selected == "Pano":
