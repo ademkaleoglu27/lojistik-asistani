@@ -14,7 +14,7 @@ from docxtpl import DocxTemplate
 from fpdf import FPDF
 import io
 
-# --- 1. SAYFA AYARLARI ---
+# --- 1. SAYFA VE TASARIM AYARLARI ---
 st.set_page_config(
     page_title="Özkaraaslan Saha",
     page_icon="⛽", 
@@ -22,19 +22,99 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. CSS TASARIMI ---
+# --- 2. BOLT-STYLE CSS TASARIMI (PREMIUM UI) ---
 def local_css():
     st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
-        html, body, [class*="css"] { font-family: 'Roboto', sans-serif; background-color: #f4f6f9; }
-        .hero-card { background: linear-gradient(135deg, #e30613 0%, #8a040b 100%); padding: 20px; border-radius: 15px; color: white; box-shadow: 0 8px 15px rgba(227, 6, 19, 0.2); margin-bottom: 20px; }
-        .kpi-container { background-color: white; padding: 10px; border-radius: 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-bottom: 3px solid #e30613; }
-        .kpi-val { font-size: 1.4rem; font-weight: 700; color: #1f2937; }
-        .stButton>button { border-radius: 8px; height: 45px; font-weight: 600; width: 100%; }
-        .nav-link-selected { background-color: #e30613 !important; }
-        .compare-box { padding: 20px; border-radius: 12px; text-align: center; color: #333; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .price-tag { font-size: 1.8rem; font-weight: 800; margin: 10px 0; }
+        /* Modern Font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        html, body, [class*="css"] {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Çok açık gri-mavi */
+            color: #111827;
+        }
+        
+        /* Giriş Kutusu */
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            text-align: center;
+            max-width: 400px;
+            margin: 50px auto;
+        }
+        
+        /* Hero Card (Ana Başlık) */
+        .hero-card {
+            background: linear-gradient(135deg, #e30613 0%, #991b1b 100%);
+            padding: 32px;
+            border-radius: 24px;
+            color: white;
+            box-shadow: 0 10px 15px -3px rgba(227, 6, 19, 0.3);
+            margin-bottom: 30px;
+            text-align: left;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-title { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px; margin: 0; }
+        .hero-subtitle { font-size: 1rem; opacity: 0.9; font-weight: 400; margin-top: 8px; }
+        
+        /* KPI Kartları (Dashboard) */
+        .kpi-card {
+            background: white;
+            padding: 24px;
+            border-radius: 20px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            border-color: #e30613;
+        }
+        .kpi-value { font-size: 2.2rem; font-weight: 800; color: #111827; }
+        .kpi-label { font-size: 0.875rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; }
+        
+        /* Müşteri Kartı (Liste) */
+        .customer-card {
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            border-left: 6px solid #e30613;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            margin-bottom: 15px;
+        }
+        
+        /* Input Alanları */
+        .stTextInput input, .stSelectbox div[data-baseweb="select"], .stNumberInput input {
+            border-radius: 12px !important;
+            border: 1px solid #d1d5db !important;
+            padding: 12px !important;
+            font-size: 1rem !important;
+        }
+        .stTextInput input:focus {
+            border-color: #e30613 !important;
+            box-shadow: 0 0 0 2px rgba(227, 6, 19, 0.2) !important;
+        }
+        
+        /* Butonlar */
+        .stButton>button {
+            border-radius: 12px;
+            height: 50px;
+            font-weight: 600;
+            font-size: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: none;
+        }
+        
+        /* Menü */
+        .nav-link-selected { background-color: #e30613 !important; border-radius: 12px !important; }
+        
+        /* Gizle */
         #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -46,16 +126,25 @@ KULLANICI_ADI = "admin"
 SIFRE = "1234"
 
 def giris_ekrani():
-    st.markdown("<br><br><h2 style='text-align:center; color:#e30613;'>🔐 Özkaraaslan Giriş</h2>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1,2,1])
+    c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
-        k = st.text_input("Kullanıcı")
-        s = st.text_input("Şifre", type="password")
-        if st.button("Giriş", type="primary"):
+        st.markdown("""
+        <div class="login-container">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/2/2e/Petrol_Ofisi_logo.svg" width="100">
+            <h2 style="margin-top:20px; color:#111827;">Personel Girişi</h2>
+            <p style="color:#6b7280;">Saha operasyon sistemine hoş geldiniz.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        k = st.text_input("Kullanıcı Adı", placeholder="Kullanıcı adınızı girin")
+        s = st.text_input("Şifre", type="password", placeholder="Şifrenizi girin")
+        
+        if st.button("Giriş Yap", type="primary", use_container_width=True):
             if k == KULLANICI_ADI and s == SIFRE:
                 st.session_state['giris_yapildi'] = True
                 st.rerun()
-            else: st.error("Hatalı!")
+            else:
+                st.error("Giriş bilgileri hatalı.")
 
 if not st.session_state['giris_yapildi']:
     giris_ekrani()
@@ -74,35 +163,56 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
-# --- FONT DÜZELTME (PDF/WORD) ---
+# --- FİYAT ÇEKME MOTORU (V43.0) ---
+def turkce_karakter_duzelt(text):
+    text = text.lower()
+    replacements = {'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', 'İ': 'i', 'Ğ': 'g', 'Ü': 'u', 'Ş': 's', 'Ö': 'o', 'Ç': 'c'}
+    for src, target in replacements.items():
+        text = text.replace(src, target)
+    return text
+
+@st.cache_data(ttl=3600)
+def fiyat_cek_garanti(sehir):
+    try:
+        sehir_slug = turkce_karakter_duzelt(sehir)
+        url = f"https://kur.doviz.com/akaryakit-fiyatlari/{sehir_slug}"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=4)
+        if response.status_code == 200:
+            dfs = pd.read_html(response.content)
+            for df in dfs:
+                if "Petrol Ofisi" in str(df) or "PETROL OFİSİ" in str(df):
+                    for index, row in df.iterrows():
+                        if "petrol ofisi" in str(row.values).lower():
+                            values = [str(x).replace('TL', '').replace(',', '.').strip() for x in row if isinstance(x, (int, float, str))]
+                            for val in values:
+                                try:
+                                    fiyat = float(val)
+                                    if 35 < fiyat < 60: return fiyat
+                                except: continue
+    except: pass
+    return 0.0
+
+# --- WORD & PDF FORMATLAMA ---
 def tr_upper(text):
-    if not text: return ""
-    return str(text).replace('i', 'İ').replace('ı', 'I').upper()
+    return str(text).replace('i', 'İ').replace('ı', 'I').upper() if text else ""
 
 def tr_title(text):
     if not text: return ""
-    words = str(text).split()
-    new = []
-    for w in words:
-        if len(w)>0: new.append(w[0].replace('i','İ').replace('ı','I').upper() + w[1:].replace('I','ı').replace('İ','i').lower())
-    return " ".join(new)
+    return " ".join([w[0].replace('i','İ').replace('ı','I').upper() + w[1:].replace('I','ı').replace('İ','i').lower() for w in str(text).split() if w])
 
 def tr_pdf(text):
     replacements = {'ğ':'g','Ğ':'G','ü':'u','Ü':'U','ş':'s','Ş':'S','ı':'i','İ':'I','ö':'o','Ö':'O','ç':'c','Ç':'C'}
     for k,v in replacements.items(): text = text.replace(k, v)
     return text
 
-# --- WORD TEKLİF ---
 def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         doc = DocxTemplate(SABLON_DOSYASI)
         context = {
-            'firma_adi': tr_upper(firma_adi), 
-            'yetkili': tr_title(yetkili),
-            'iskonto_pompa': f"% {iskonto_pompa}",       
-            'iskonto_istasyon': f"% {iskonto_istasyon}", 
-            'odeme_sekli': str(odeme_sekli), 
-            'tarih': datetime.now().strftime("%d.%m.%Y")
+            'firma_adi': tr_upper(firma_adi), 'yetkili': tr_title(yetkili),
+            'iskonto_pompa': f"% {iskonto_pompa}", 'iskonto_istasyon': f"% {iskonto_istasyon}",
+            'odeme_sekli': str(odeme_sekli), 'tarih': datetime.now().strftime("%d.%m.%Y")
         }
         doc.render(context)
         bio = io.BytesIO()
@@ -110,7 +220,6 @@ def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli,
         return bio.getvalue()
     except: return None
 
-# --- PDF TEKLİF ---
 def pdf_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         pdf = FPDF()
@@ -149,8 +258,7 @@ def get_google_sheet_client():
         import json
         creds_dict = json.loads(creds_dict["info"])
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    client = gspread.authorize(creds)
-    return client
+    return gspread.authorize(creds)
 
 @st.cache_data(ttl=10)
 def veri_tabanini_yukle():
@@ -188,7 +296,7 @@ def veriyi_kaydet(df):
         st.cache_data.clear()
     except Exception as e: st.error(f"Kayıt Hatası: {e}")
 
-# --- FONKSİYONLAR ---
+# --- YARDIMCI FONKSİYONLAR ---
 def siteyi_tara_mail_bul(website_url):
     if not website_url or "http" not in website_url: return ""
     try:
@@ -258,14 +366,19 @@ st.write("")
 # --- PANO ---
 if selected == "Pano":
     tarih_str = datetime.now().strftime("%d %B %Y")
-    st.markdown(f"""<div class="hero-card"><h3>👋 Merhaba, Müdürüm</h3><p>{tarih_str} | Saha Operasyon Paneli</p></div>""", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="hero-card">
+        <div class="hero-title">👋 Merhaba, Müdürüm</div>
+        <div class="hero-subtitle">📅 {tarih_str} | Saha Operasyon Paneli</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     df = veri_tabanini_yukle()
     if not df.empty:
         c1, c2, c3 = st.columns(3)
-        c1.markdown(f"""<div class="kpi-container"><div class="kpi-val">{len(df)}</div><p>Müşteri</p></div>""", unsafe_allow_html=True)
-        c2.markdown(f"""<div class="kpi-container"><div class="kpi-val" style="color:#f59e0b">{len(df[df["Durum"] == "Yeni"])}</div><p>Bekleyen</p></div>""", unsafe_allow_html=True)
-        c3.markdown(f"""<div class="kpi-container"><div class="kpi-val" style="color:#10b981">{len(df[df["Durum"] == "✅ Anlaşıldı"])}</div><p>Başarılı</p></div>""", unsafe_allow_html=True)
+        c1.markdown(f"""<div class="kpi-card"><div class="kpi-value">{len(df)}</div><div class="kpi-label">Toplam Müşteri</div></div>""", unsafe_allow_html=True)
+        c2.markdown(f"""<div class="kpi-card" style="border-bottom-color: #f59e0b;"><div class="kpi-value" style="color:#f59e0b">{len(df[df["Durum"] == "Yeni"])}</div><div class="kpi-label">Bekleyen</div></div>""", unsafe_allow_html=True)
+        c3.markdown(f"""<div class="kpi-card" style="border-bottom-color: #10b981;"><div class="kpi-value" style="color:#10b981">{len(df[df["Durum"] == "✅ Anlaşıldı"])}</div><div class="kpi-label">Başarılı</div></div>""", unsafe_allow_html=True)
         
         st.write("")
         st.markdown("##### 📋 Son Hareketler")
@@ -284,7 +397,7 @@ elif selected == "Firma Bul":
 
     if tara_btn:
         arama_sorgusu = SEKTORLER[sektor_key]
-        st.toast("Veriler çekiliyor...", icon="⏳")
+        st.toast("Aranıyor...", icon="⏳")
         tum_firmalar = []
         next_page_token = None
         sayfa = 0
@@ -358,7 +471,7 @@ elif selected == "Müşteriler":
             secilen_veri = df[df["Firma"] == arama_terimi].iloc[0]
             idx = df[df["Firma"] == arama_terimi].index[0]
             
-            st.markdown(f"""<div class="customer-card"><h4>🏢 {secilen_veri['Firma']}</h4></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="customer-card"><h3 style="margin:0; color:#e30613;">🏢 {secilen_veri['Firma']}</h3></div>""", unsafe_allow_html=True)
             
             with st.form("musteri_duzenle"):
                 c1, c2 = st.columns(2)
@@ -367,7 +480,6 @@ elif selected == "Müşteriler":
                     yeni_tel = st.text_input("Telefon", value=secilen_veri['Telefon'])
                     yeni_email = st.text_input("Email", value=secilen_veri['Email'])
                     yeni_arac = st.text_input("🚛 Araç Sayısı", value=secilen_veri.get('Arac_Sayisi', ''))
-                    yeni_sektor = st.text_input("🏭 Sektör", value=secilen_veri.get('Firma_Sektoru', ''))
                 with c2:
                     durum_listesi = ["Yeni", "📞 Arandı", "⏳ Teklif Verildi", "✅ Anlaşıldı", "❌ Olumsuz"]
                     try: m_idx = durum_listesi.index(secilen_veri['Durum'])
@@ -376,8 +488,8 @@ elif selected == "Müşteriler":
                     yeni_tuketim = st.text_input("Tüketim (m3/Ton)", value=secilen_veri.get('Tuketim_Bilgisi', ''))
                     yeni_iskonto = st.text_input("💸 İskonto (%)", value=secilen_veri.get('Iskonto_Orani', ''))
                     
-                    st.write("🗓️ **Randevu & Bildirim**")
-                    col_date, col_time = st.columns(2)
+                    st.write("🗓️ **Randevu**")
+                    col_d, col_t = st.columns(2)
                     val_hatirlat_tar = secilen_veri.get('Hatirlatici_Tarih')
                     if pd.isna(val_hatirlat_tar): val_hatirlat_tar = None
                     yeni_hatirlat_tar = col_date.date_input("Tarih", value=val_hatirlat_tar)
@@ -412,7 +524,6 @@ elif selected == "Müşteriler":
                 df.at[idx, 'Durum'] = yeni_durum
                 df.at[idx, 'Tuketim_Bilgisi'] = yeni_tuketim
                 df.at[idx, 'Arac_Sayisi'] = yeni_arac
-                df.at[idx, 'Firma_Sektoru'] = yeni_sektor
                 df.at[idx, 'Konum_Linki'] = yeni_konum
                 df.at[idx, 'Iskonto_Orani'] = yeni_iskonto
                 df.at[idx, 'Dosya_Linki'] = yeni_dosya
@@ -482,16 +593,16 @@ elif selected == "Müşteriler":
 elif selected == "Teklif & Hesap":
     st.markdown("#### 🧮 Hesaplama & Teklif")
     
-    # --- FİYAT LİSTESİ LİNKİ (YENİ YERİ) ---
-    st.link_button("⛽ RESMİ FİYAT LİSTESİ İÇİN TIKLA", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
+    # Fiyat Linki (En tepede)
+    st.link_button("⛽ RESMİ FİYAT LİSTESİ", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
     st.write("")
     
-    tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word Teklif Oluştur"])
+    tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word & PDF Teklif"])
     
     with tab_hesap:
-        # MANUEL FİYAT GİRİŞİ (En Üstte)
+        # MANUEL FİYAT GİRİŞİ
         if 'manual_price' not in st.session_state: st.session_state['manual_price'] = 44.50 
-        guncel_fiyat_giris = st.number_input("⛽ GÜNCEL POMPA FİYATI (TL)", value=st.session_state['manual_price'], step=0.10)
+        guncel_fiyat_giris = st.number_input("⛽ BÖLGE POMPA FİYATI (TL):", value=st.session_state['manual_price'], step=0.10)
         st.session_state['manual_price'] = guncel_fiyat_giris 
 
         st.markdown("---")
@@ -562,29 +673,21 @@ elif selected == "Teklif & Hesap":
             
             generate_btn = st.form_submit_button("📄 Teklif Oluştur (Word & PDF)")
         
-        # İndirme Butonları
         if generate_btn:
             if p_firma:
                 col_d1, col_d2 = st.columns(2)
-                
-                # 1. WORD
+                # Word
                 try:
                     word_bytes = word_teklif_olustur(p_firma, p_iskonto_pompa, p_iskonto_istasyon, p_odeme, p_yetkili)
-                    if word_bytes:
-                        col_d1.download_button("📥 WORD İNDİR", word_bytes, f"{p_firma}_Teklif.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", type="primary")
-                    else:
-                        col_d1.error("Word Şablonu Yok!")
-                except Exception as e: col_d1.error(f"Word Hatası: {e}")
+                    if word_bytes: col_d1.download_button("📥 WORD İNDİR", word_bytes, f"{p_firma}_Teklif.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", type="primary")
+                    else: col_d1.error("Şablon Yok!")
+                except: col_d1.error("Word Hatası")
 
-                # 2. PDF (Sıfırdan Üretim)
+                # PDF
                 try:
                     pdf_bytes = pdf_teklif_olustur(p_firma, p_iskonto_pompa, p_iskonto_istasyon, p_odeme, p_yetkili)
-                    if pdf_bytes:
-                        col_d2.download_button("📥 PDF İNDİR", pdf_bytes, f"{p_firma}_Teklif.pdf", "application/pdf", type="secondary")
-                    else:
-                        col_d2.error("PDF Oluşturulamadı")
-                except Exception as e: col_d2.error(f"PDF Hatası: {e}")
-
+                    if pdf_bytes: col_d2.download_button("📥 PDF İNDİR", pdf_bytes, f"{p_firma}_Teklif.pdf", "application/pdf", type="secondary")
+                except: col_d2.error("PDF Hatası")
             else: st.error("Firma adı giriniz.")
 
 # --- AJANDA ---
