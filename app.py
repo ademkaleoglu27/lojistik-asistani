@@ -35,11 +35,17 @@ def local_css():
         
         /* Karşılaştırma Kutuları */
         .compare-box {
-            padding: 15px;
-            border-radius: 10px;
+            padding: 20px;
+            border-radius: 12px;
             text-align: center;
             color: #333;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .price-tag {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin: 10px 0;
         }
         
         #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
@@ -317,11 +323,7 @@ elif selected == "Müşteriler":
             secilen_veri = df[df["Firma"] == arama_terimi].iloc[0]
             idx = df[df["Firma"] == arama_terimi].index[0]
             
-            st.markdown(f"""
-            <div class="customer-card">
-                <span style='font-size:1.5rem;'>🏢</span> <span style='font-size:1.2rem; font-weight:bold;'>{secilen_veri['Firma']}</span>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f"""<div class="customer-card"><h4>🏢 {secilen_veri['Firma']}</h4></div>""", unsafe_allow_html=True)
             
             with st.form("musteri_duzenle"):
                 c1, c2 = st.columns(2)
@@ -336,10 +338,10 @@ elif selected == "Müşteriler":
                     try: m_idx = durum_listesi.index(secilen_veri['Durum'])
                     except: m_idx = 0
                     yeni_durum = st.selectbox("Durum", durum_listesi, index=m_idx)
-                    yeni_tuketim = st.text_input("Tüketim (m3/Ton)", value=secilen_veri.get('Tuketim_Bilgisi', ''))
+                    yeni_tuketim = st.text_input("Tüketim", value=secilen_veri.get('Tuketim_Bilgisi', ''))
                     yeni_iskonto = st.text_input("💸 İskonto (%)", value=secilen_veri.get('Iskonto_Orani', ''))
                     
-                    st.write("🗓️ **Randevu & Bildirim**")
+                    st.write("🗓️ **Randevu**")
                     col_date, col_time = st.columns(2)
                     val_hatirlat_tar = secilen_veri.get('Hatirlatici_Tarih')
                     if pd.isna(val_hatirlat_tar): val_hatirlat_tar = None
@@ -350,9 +352,9 @@ elif selected == "Müşteriler":
                     yeni_hatirlat_saat = col_time.time_input("Saat", value=time_obj)
 
                 yeni_adres = st.text_area("Adres", value=secilen_veri['Adres'], height=60)
-                yeni_konum = st.text_input("📍 Konum (Link)", value=secilen_veri.get('Konum_Linki', ''))
+                yeni_konum = st.text_input("📍 Konum Linki", value=secilen_veri.get('Konum_Linki', ''))
                 yeni_dosya = st.text_input("📄 Dosya Linki", value=secilen_veri.get('Dosya_Linki', ''))
-                yeni_not = st.text_area("Görüşme Notları", value=secilen_veri['Notlar'])
+                yeni_not = st.text_area("Notlar", value=secilen_veri['Notlar'])
                 
                 col_b1, col_b2, col_b3, col_b4 = st.columns(4)
                 if arama_linki_yap(yeni_tel): col_b1.link_button("📞 Ara", arama_linki_yap(yeni_tel), use_container_width=True)
@@ -474,6 +476,9 @@ elif selected == "Teklif & Hesap":
                 st.markdown(f"""
                 <div class='compare-box' style='background:#e0f2fe; border:1px solid #7dd3fc;'>
                     <h4>⛽ Pompa (%{iskonto_orani})</h4>
+                    <div class='price-tag' style='color:#0369a1;'>{indirimli_pompa:,.2f} TL</div>
+                    <small>İndirimli Litre Fiyatı</small>
+                    <hr style='margin:10px 0; opacity:0.3;'>
                     <p>Aylık Kazanç: <b>{aylik_kazanc_pompa:,.2f} TL</b></p>
                     <p>Yıllık Kazanç: <b>{yillik_kazanc_pompa:,.2f} TL</b></p>
                 </div>
@@ -483,6 +488,9 @@ elif selected == "Teklif & Hesap":
                 st.markdown(f"""
                 <div class='compare-box' style='background:#dcfce7; border:1px solid #86efac;'>
                     <h4>🏪 Anlaşmalı İst. (%{iskonto_anlasmali})</h4>
+                    <div class='price-tag' style='color:#15803d;'>{indirimli_ist:,.2f} TL</div>
+                    <small>İndirimli Litre Fiyatı</small>
+                    <hr style='margin:10px 0; opacity:0.3;'>
                     <p>Aylık Kazanç: <b>{aylik_kazanc_ist:,.2f} TL</b></p>
                     <p>Yıllık Kazanç: <b>{yillik_kazanc_ist:,.2f} TL</b></p>
                 </div>
