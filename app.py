@@ -13,7 +13,7 @@ from streamlit_option_menu import option_menu
 from docxtpl import DocxTemplate
 import io
 
-# --- 1. SAYFA VE TASARIM AYARLARI ---
+# --- 1. SAYFA AYARLARI ---
 st.set_page_config(
     page_title="Özkaraaslan Saha",
     page_icon="⛽", 
@@ -48,13 +48,15 @@ def giris_ekrani():
     st.markdown("<br><br><h2 style='text-align:center; color:#e30613;'>🔐 Özkaraaslan Giriş</h2>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
-        k = st.text_input("Kullanıcı")
-        s = st.text_input("Şifre", type="password")
-        if st.button("Giriş", type="primary"):
-            if k == KULLANICI_ADI and s == SIFRE:
-                st.session_state['giris_yapildi'] = True
-                st.rerun()
-            else: st.error("Hatalı!")
+        with st.form("login_form"):
+            k = st.text_input("Kullanıcı")
+            s = st.text_input("Şifre", type="password")
+            btn = st.form_submit_button("Giriş Yap", type="primary")
+            if btn:
+                if k == KULLANICI_ADI and s == SIFRE:
+                    st.session_state['giris_yapildi'] = True
+                    st.rerun()
+                else: st.error("Hatalı!")
 
 if not st.session_state['giris_yapildi']:
     giris_ekrani()
@@ -62,8 +64,10 @@ if not st.session_state['giris_yapildi']:
 
 # --- SABİTLER ---
 SHEET_ADI = "Lojistik_Verileri"
-API_KEY = "BURAYA_API_KEYINI_YAPISTIR" 
+API_KEY = "AIzaSyCw0bhZ2WTrZtThjgJBMsbjZ7IDh6QN0Og"
 SABLON_DOSYASI = "teklif_sablonu.docx" 
+# HATA VEREN LOGO TANIMI BURADA:
+LOGO_URL = "https://www.ozkaraaslanfilo.com/wp-content/uploads/2021/01/logo.png"
 
 SEKTORLER = {
     "🚛 Lojistik": "Lojistik Firmaları", "📦 Nakliye": "Yurt İçi Nakliye Firmaları", "🌍 Uluslararası": "Uluslararası Transport",
@@ -72,6 +76,7 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
+# ŞEHİR LİSTESİ
 SEHIRLER = [
     "Adana", "Adiyaman", "Afyonkarahisar", "Agri", "Amasya", "Ankara", "Antalya", "Artvin", "Aydin", "Balikesir", 
     "Bilecik", "Bingol", "Bitlis", "Bolu", "Burdur", "Bursa", "Canakkale", "Cankiri", "Corum", "Denizli", 
@@ -83,46 +88,54 @@ SEHIRLER = [
     "Kirikkale", "Batman", "Sirnak", "Bartin", "Ardahan", "Igdir", "Yalova", "Karabuk", "Kilis", "Osmaniye", "Duzce"
 ]
 
-# --- TÜRKÇE KARAKTER UYUMLU BÜYÜK/KÜÇÜK HARF ---
-def tr_upper(text):
-    """Türkçe karakterleri koruyarak BÜYÜK HARF yapar"""
-    if not text: return ""
-    text = str(text).replace('i', 'İ').replace('ı', 'I')
-    return text.upper()
+# --- FİYAT ÇEKME MOTORU (STABİL) ---
+def turkce_karakter_duzelt(text):
+    text = text.lower()
+    replacements = {'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', 'İ': 'i', 'Ğ': 'g', 'Ü': 'u', 'Ş': 's', 'Ö': 'o', 'Ç': 'c'}
+    for src, target in replacements.items():
+        text = text.replace(src, target)
+    return text
 
-def tr_title(text):
-    """Türkçe karakterleri koruyarak Baş Harfleri Büyük yapar"""
-    if not text: return ""
-    words = str(text).split()
-    new_words = []
-    for word in words:
-        if len(word) > 0:
-            first = word[0].replace('i', 'İ').replace('ı', 'I').upper()
-            rest = word[1:].replace('I', 'ı').replace('İ', 'i').lower()
-            new_words.append(first + rest)
-    return " ".join(new_words)
+@st.cache_data(ttl=600) # 10 dakika cache
+def fiyat_cek_garanti(sehir):
+    try:
+        sehir_slug = turkce_karakter_duzelt(sehir)
+        # 1. Kaynak: Döviz.com (Daha kararlı)
+        url = f"https://kur.doviz.com/akaryakit-fiyatlari/{sehir_slug}"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=4)
+        
+        if response.status_code == 200:
+            try:
+                dfs = pd.read_html(response.content) # lxml gerektirir
+                for df in dfs:
+                    if "Petrol Ofisi" in str(df):
+                        for index, row in df.iterrows():
+                            if "petrol ofisi" in str(row.values).lower():
+                                values = [str(x).replace('TL', '').replace(',', '.').strip() for x in row if isinstance(x, (int, float, str))]
+                                for val in values:
+                                    try:
+                                        fiyat = float(val)
+                                        if 35 < fiyat < 60: return fiyat
+                                    except: continue
+            except: pass
+    except: pass
+    return 0.0
 
-# --- WORD TEKLİF OLUŞTURUCU (GÜNCELLENDİ) ---
+# --- WORD TEKLİF ---
 def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         doc = DocxTemplate(SABLON_DOSYASI)
-        
-        # Yazıları otomatik formatla (Firma BÜYÜK, Yetkili Baş Harf)
         context = {
-            'firma_adi': tr_upper(firma_adi), 
-            'yetkili': tr_title(yetkili),
-            'iskonto_pompa': str(iskonto_pompa), 
-            'iskonto_istasyon': str(iskonto_istasyon),
-            'odeme_sekli': str(odeme_sekli), 
-            'tarih': datetime.now().strftime("%d.%m.%Y")
+            'firma_adi': firma_adi, 'yetkili': yetkili,
+            'iskonto_pompa': iskonto_pompa, 'iskonto_istasyon': iskonto_istasyon,
+            'odeme_sekli': odeme_sekli, 'tarih': datetime.now().strftime("%d.%m.%Y")
         }
-        
         doc.render(context)
         bio = io.BytesIO()
         doc.save(bio)
         return bio.getvalue()
-    except Exception as e:
-        return None
+    except: return None
 
 # --- GOOGLE SHEETS ---
 def get_google_sheet_client():
@@ -170,36 +183,6 @@ def veriyi_kaydet(df):
         sheet.update([df_save.columns.values.tolist()] + df_save.values.tolist())
         st.cache_data.clear()
     except Exception as e: st.error(f"Kayıt Hatası: {e}")
-
-# --- FİYAT ÇEKME MOTORU ---
-def turkce_karakter_duzelt(text):
-    text = text.lower()
-    replacements = {'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', 'İ': 'i', 'Ğ': 'g', 'Ü': 'u', 'Ş': 's', 'Ö': 'o', 'Ç': 'c'}
-    for src, target in replacements.items():
-        text = text.replace(src, target)
-    return text
-
-@st.cache_data(ttl=3600)
-def fiyat_cek_garanti(sehir):
-    try:
-        sehir_slug = turkce_karakter_duzelt(sehir)
-        url = f"https://kur.doviz.com/akaryakit-fiyatlari/{sehir_slug}/"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=4)
-        if response.status_code == 200:
-            dfs = pd.read_html(response.content)
-            for df in dfs:
-                if "Petrol Ofisi" in str(df) or "PETROL OFİSİ" in str(df):
-                    for index, row in df.iterrows():
-                        if "petrol ofisi" in str(row.values).lower():
-                            values = [str(x).replace('TL', '').replace(',', '.').strip() for x in row if isinstance(x, (int, float, str))]
-                            for val in values:
-                                try:
-                                    fiyat = float(val)
-                                    if 35 < fiyat < 60: return fiyat
-                                except: continue
-    except: pass
-    return 0.0
 
 # --- FONKSİYONLAR ---
 def siteyi_tara_mail_bul(website_url):
@@ -500,16 +483,16 @@ elif selected == "Teklif & Hesap":
         col_sehir, col_bos = st.columns([2, 1])
         secilen_sehir = col_sehir.selectbox("🌍 Şehir Seç", SEHIRLER, index=SEHIRLER.index("Gaziantep"))
         
-        # --- FİYAT ÇEKME İŞLEMİ ---
+        # --- FİYAT ÇEKME (GARANTİLİ) ---
         oto_fiyat = 0.0
-        with st.spinner("Fiyat alınıyor..."):
+        with st.spinner("Güncel fiyat alınıyor..."):
             oto_fiyat = fiyat_cek_garanti(secilen_sehir)
-            
+        
         if oto_fiyat == 0.0:
-            st.warning("⚠️ Fiyat otomatik çekilemedi. Lütfen manuel giriniz.")
+            st.warning("⚠️ Otomatik fiyat alınamadı. Lütfen manuel giriniz.")
             oto_fiyat = 44.00 
         else:
-            st.success(f"✅ {secilen_sehir}: {oto_fiyat} TL")
+            st.success(f"✅ Güncel PO Fiyatı: {oto_fiyat} TL")
             
         c1, c2 = st.columns(2)
         with c1:
