@@ -32,6 +32,16 @@ def local_css():
         .kpi-val { font-size: 1.4rem; font-weight: 700; color: #1f2937; }
         .stButton>button { border-radius: 8px; height: 45px; font-weight: 600; width: 100%; }
         .nav-link-selected { background-color: #e30613 !important; }
+        
+        /* Karşılaştırma Kutuları */
+        .compare-box {
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
         #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -70,16 +80,16 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
-# --- WORD TEKLİF OLUŞTURUCU (GÜNCELLENDİ) ---
+# --- WORD TEKLİF OLUŞTURUCU ---
 def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         doc = DocxTemplate(SABLON_DOSYASI)
         context = {
             'firma_adi': firma_adi,
             'yetkili': yetkili,
-            'iskonto_pompa': iskonto_pompa,       # YENİ
-            'iskonto_istasyon': iskonto_istasyon, # YENİ
-            'odeme_sekli': odeme_sekli,           # YENİ (Vade yerine)
+            'iskonto_pompa': iskonto_pompa,
+            'iskonto_istasyon': iskonto_istasyon,
+            'odeme_sekli': odeme_sekli,
             'tarih': datetime.now().strftime("%d.%m.%Y")
         }
         doc.render(context)
@@ -307,14 +317,18 @@ elif selected == "Müşteriler":
             secilen_veri = df[df["Firma"] == arama_terimi].iloc[0]
             idx = df[df["Firma"] == arama_terimi].index[0]
             
-            st.markdown(f"""<div class="customer-card"><h4>🏢 {secilen_veri['Firma']}</h4></div>""", unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class="customer-card">
+                <span style='font-size:1.5rem;'>🏢</span> <span style='font-size:1.2rem; font-weight:bold;'>{secilen_veri['Firma']}</span>
+            </div>
+            """, unsafe_allow_html=True)
             
             with st.form("musteri_duzenle"):
                 c1, c2 = st.columns(2)
                 with c1:
                     yeni_yetkili = st.text_input("👤 Yetkili İsim", value=secilen_veri.get('Yetkili_Kisi', ''))
-                    yeni_tel = st.text_input("📞 Telefon", value=secilen_veri['Telefon'])
-                    yeni_email = st.text_input("📧 Email", value=secilen_veri['Email'])
+                    yeni_tel = st.text_input("Telefon", value=secilen_veri['Telefon'])
+                    yeni_email = st.text_input("Email", value=secilen_veri['Email'])
                     yeni_arac = st.text_input("🚛 Araç Sayısı", value=secilen_veri.get('Arac_Sayisi', ''))
                     yeni_sektor = st.text_input("🏭 Sektör", value=secilen_veri.get('Firma_Sektoru', ''))
                 with c2:
@@ -323,7 +337,6 @@ elif selected == "Müşteriler":
                     except: m_idx = 0
                     yeni_durum = st.selectbox("Durum", durum_listesi, index=m_idx)
                     yeni_tuketim = st.text_input("Tüketim (m3/Ton)", value=secilen_veri.get('Tuketim_Bilgisi', ''))
-                    # İSKONTO ALANI
                     yeni_iskonto = st.text_input("💸 İskonto (%)", value=secilen_veri.get('Iskonto_Orani', ''))
                     
                     st.write("🗓️ **Randevu & Bildirim**")
@@ -337,17 +350,17 @@ elif selected == "Müşteriler":
                     yeni_hatirlat_saat = col_time.time_input("Saat", value=time_obj)
 
                 yeni_adres = st.text_area("Adres", value=secilen_veri['Adres'], height=60)
-                yeni_konum = st.text_input("📍 Konum Linki", value=secilen_veri.get('Konum_Linki', ''))
+                yeni_konum = st.text_input("📍 Konum (Link)", value=secilen_veri.get('Konum_Linki', ''))
                 yeni_dosya = st.text_input("📄 Dosya Linki", value=secilen_veri.get('Dosya_Linki', ''))
-                yeni_not = st.text_area("Notlar", value=secilen_veri['Notlar'])
+                yeni_not = st.text_area("Görüşme Notları", value=secilen_veri['Notlar'])
                 
                 col_b1, col_b2, col_b3, col_b4 = st.columns(4)
-                if arama_linki_yap(yeni_tel): col_b1.link_button("📞", arama_linki_yap(yeni_tel), use_container_width=True)
-                if whatsapp_linki_yap(yeni_tel): col_b2.link_button("💬", whatsapp_linki_yap(yeni_tel), use_container_width=True)
+                if arama_linki_yap(yeni_tel): col_b1.link_button("📞 Ara", arama_linki_yap(yeni_tel), use_container_width=True)
+                if whatsapp_linki_yap(yeni_tel): col_b2.link_button("💬 WP", whatsapp_linki_yap(yeni_tel), use_container_width=True)
                 nav_link = navigasyon_linki_yap(yeni_adres, yeni_konum)
-                if nav_link: col_b3.link_button("🗺️", nav_link, use_container_width=True)
+                if nav_link: col_b3.link_button("🗺️ Yol", nav_link, use_container_width=True)
                 cal_link = google_calendar_link(f"Görüşme: {secilen_veri['Firma']}", yeni_hatirlat_tar, yeni_hatirlat_saat.strftime('%H:%M'), yeni_adres, yeni_not)
-                if cal_link: col_b4.link_button("📅", cal_link, use_container_width=True)
+                if cal_link: col_b4.link_button("📅 Takvim", cal_link, use_container_width=True)
                 
                 if yeni_dosya and "http" in yeni_dosya:
                     st.link_button("📂 Dosyayı Aç", yeni_dosya, type="secondary", use_container_width=True)
@@ -444,15 +457,36 @@ elif selected == "Teklif & Hesap":
         
         st.markdown("---")
         if aylik_litre > 0:
-            # Hesaplama (Pompa üzerinden)
-            indirimli_fiyat = guncel_fiyat * (1 - (iskonto_orani/100))
-            aylik_kazanc = (guncel_fiyat - indirimli_fiyat) * aylik_litre
-            yillik_kazanc = aylik_kazanc * 12
+            # POMPA İSKONTOSU HESABI
+            indirimli_pompa = guncel_fiyat * (1 - (iskonto_orani/100))
+            aylik_kazanc_pompa = (guncel_fiyat - indirimli_pompa) * aylik_litre
+            yillik_kazanc_pompa = aylik_kazanc_pompa * 12
             
-            c_res1, c_res2 = st.columns(2)
-            c_res1.metric("Aylık Kazanç", f"{aylik_kazanc:,.2f} TL")
-            c_res2.metric("Yıllık Kazanç", f"{yillik_kazanc:,.2f} TL", delta="Müşteri Kârı")
-            st.success(f"Müşteriye teklif edilecek fiyat: **{indirimli_fiyat:.2f} TL**")
+            # ANLAŞMALI İSTASYON HESABI
+            indirimli_ist = guncel_fiyat * (1 - (iskonto_anlasmali/100))
+            aylik_kazanc_ist = (guncel_fiyat - indirimli_ist) * aylik_litre
+            yillik_kazanc_ist = aylik_kazanc_ist * 12
+            
+            # SONUÇLARI YAN YANA GÖSTER (KARŞILAŞTIRMA)
+            col_res1, col_res2 = st.columns(2)
+            
+            with col_res1:
+                st.markdown(f"""
+                <div class='compare-box' style='background:#e0f2fe; border:1px solid #7dd3fc;'>
+                    <h4>⛽ Pompa (%{iskonto_orani})</h4>
+                    <p>Aylık Kazanç: <b>{aylik_kazanc_pompa:,.2f} TL</b></p>
+                    <p>Yıllık Kazanç: <b>{yillik_kazanc_pompa:,.2f} TL</b></p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            with col_res2:
+                st.markdown(f"""
+                <div class='compare-box' style='background:#dcfce7; border:1px solid #86efac;'>
+                    <h4>🏪 Anlaşmalı İst. (%{iskonto_anlasmali})</h4>
+                    <p>Aylık Kazanç: <b>{aylik_kazanc_ist:,.2f} TL</b></p>
+                    <p>Yıllık Kazanç: <b>{yillik_kazanc_ist:,.2f} TL</b></p>
+                </div>
+                """, unsafe_allow_html=True)
 
     with tab_pdf:
         st.info("👇 Word Şablonu Doldur (teklif_sablonu.docx gerekli)")
@@ -460,12 +494,10 @@ elif selected == "Teklif & Hesap":
             p_firma = st.text_input("Firma Adı")
             p_yetkili = st.text_input("Yetkili")
             
-            # GÜNCELLENEN ALANLAR
             col_pdf1, col_pdf2 = st.columns(2)
             p_iskonto_pompa = col_pdf1.number_input("Pompa İskonto (%)", value=3.0)
             p_iskonto_istasyon = col_pdf2.number_input("Anlaşmalı İst. İskonto (%)", value=0.0)
             
-            # VADE SEÇENEKLERİ
             odeme_secenekleri = [
                 "Fatura Kesiminden 5 Gün Sonra", 
                 "Fatura Kesiminden 10 Gün Sonra", 
@@ -480,7 +512,6 @@ elif selected == "Teklif & Hesap":
         if generate_btn:
             if p_firma:
                 try:
-                    # Fonksiyona yeni parametreleri gönder
                     word_bytes = word_teklif_olustur(p_firma, p_iskonto_pompa, p_iskonto_istasyon, p_odeme, p_yetkili)
                     if word_bytes:
                         st.download_button("📥 WORD İNDİR", word_bytes, f"{p_firma}_Teklif.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", type="primary")
