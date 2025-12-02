@@ -14,110 +14,113 @@ from docxtpl import DocxTemplate
 from fpdf import FPDF
 import io
 
-# --- 1. SAYFA VE TASARIM AYARLARI ---
+# --- 1. SAYFA VE GENEL AYARLAR ---
 st.set_page_config(
     page_title="Özkaraaslan Saha",
     page_icon="⛽", 
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# --- 2. BOLT-STYLE CSS TASARIMI (PREMIUM UI) ---
+# --- 2. NEXT-GEN UI CSS (BOLT STYLE) ---
 def local_css():
     st.markdown("""
     <style>
-        /* Modern Font */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        /* Google Font: Inter */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         
         html, body, [class*="css"] {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6; /* Çok açık gri-mavi */
+            background-color: #f3f4f6; /* Açık Gri Arkaplan */
             color: #111827;
         }
-        
-        /* Giriş Kutusu */
-        .login-container {
-            background: white;
-            padding: 40px;
-            border-radius: 24px;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            text-align: center;
-            max-width: 400px;
-            margin: 50px auto;
+
+        /* Üst Boşluğu Kaldır */
+        .block-container {
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        }
+
+        /* KART TASARIMI (Card UI) */
+        .st-emotion-cache-1r6slb0, .st-emotion-cache-16idsys p {
+            font-size: 14px;
         }
         
-        /* Hero Card (Ana Başlık) */
-        .hero-card {
-            background: linear-gradient(135deg, #e30613 0%, #991b1b 100%);
-            padding: 32px;
-            border-radius: 24px;
-            color: white;
-            box-shadow: 0 10px 15px -3px rgba(227, 6, 19, 0.3);
-            margin-bottom: 30px;
-            text-align: left;
-            position: relative;
-            overflow: hidden;
-        }
-        .hero-title { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px; margin: 0; }
-        .hero-subtitle { font-size: 1rem; opacity: 0.9; font-weight: 400; margin-top: 8px; }
-        
-        /* KPI Kartları (Dashboard) */
-        .kpi-card {
-            background: white;
-            padding: 24px;
-            border-radius: 20px;
-            border: 1px solid #e5e7eb;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            transition: all 0.3s ease;
-            text-align: center;
-        }
-        .kpi-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            border-color: #e30613;
-        }
-        .kpi-value { font-size: 2.2rem; font-weight: 800; color: #111827; }
-        .kpi-label { font-size: 0.875rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; }
-        
-        /* Müşteri Kartı (Liste) */
-        .customer-card {
-            background: white;
+        /* Özel Kart Kutusu */
+        .card-container {
+            background-color: white;
             padding: 20px;
-            border-radius: 16px;
-            border-left: 6px solid #e30613;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            margin-bottom: 15px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            margin-bottom: 20px;
+            border: 1px solid #e5e7eb;
         }
-        
-        /* Input Alanları */
-        .stTextInput input, .stSelectbox div[data-baseweb="select"], .stNumberInput input {
-            border-radius: 12px !important;
-            border: 1px solid #d1d5db !important;
-            padding: 12px !important;
-            font-size: 1rem !important;
+
+        /* Başlıklar */
+        h1, h2, h3 {
+            font-weight: 700 !important;
+            color: #111827;
+            letter-spacing: -0.025em;
         }
-        .stTextInput input:focus {
-            border-color: #e30613 !important;
-            box-shadow: 0 0 0 2px rgba(227, 6, 19, 0.2) !important;
+        h4, h5, h6 {
+            font-weight: 600 !important;
+            color: #374151;
         }
-        
+
+        /* KPI Kutuları */
+        .kpi-box {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #e30613; /* PO Kırmızısı */
+            text-align: center;
+        }
+        .kpi-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #1f2937;
+            line-height: 1;
+        }
+        .kpi-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-top: 5px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
         /* Butonlar */
         .stButton>button {
-            border-radius: 12px;
-            height: 50px;
-            font-weight: 600;
-            font-size: 1rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
         }
+        .stButton>button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Tablo Başlıkları */
+        thead tr th:first-child { display:none }
+        tbody th { display:none }
         
-        /* Menü */
-        .nav-link-selected { background-color: #e30613 !important; border-radius: 12px !important; }
-        
+        /* Sidebar Düzenlemesi */
+        [data-testid="stSidebar"] {
+            background-color: #ffffff;
+            border-right: 1px solid #e5e7eb;
+        }
+
         /* Gizle */
-        #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+        #MainMenu {visibility: hidden;} 
+        footer {visibility: hidden;} 
+        header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
+
 local_css()
 
 # --- GÜVENLİK ---
@@ -126,25 +129,22 @@ KULLANICI_ADI = "admin"
 SIFRE = "1234"
 
 def giris_ekrani():
-    c1, c2, c3 = st.columns([1, 2, 1])
+    c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
         st.markdown("""
-        <div class="login-container">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/2/2e/Petrol_Ofisi_logo.svg" width="100">
-            <h2 style="margin-top:20px; color:#111827;">Personel Girişi</h2>
-            <p style="color:#6b7280;">Saha operasyon sistemine hoş geldiniz.</p>
+        <div style='background:white; padding:30px; border-radius:15px; box-shadow:0 10px 25px rgba(0,0,0,0.1); text-align:center;'>
+            <h2 style='color:#e30613; margin-bottom:10px;'>🔐 Giriş</h2>
+            <p style='color:#666; font-size:14px;'>Saha Yönetim Paneli</p>
         </div>
         """, unsafe_allow_html=True)
-        
-        k = st.text_input("Kullanıcı Adı", placeholder="Kullanıcı adınızı girin")
-        s = st.text_input("Şifre", type="password", placeholder="Şifrenizi girin")
-        
+        st.write("")
+        k = st.text_input("Kullanıcı Adı")
+        s = st.text_input("Şifre", type="password")
         if st.button("Giriş Yap", type="primary", use_container_width=True):
             if k == KULLANICI_ADI and s == SIFRE:
                 st.session_state['giris_yapildi'] = True
                 st.rerun()
-            else:
-                st.error("Giriş bilgileri hatalı.")
+            else: st.error("Hatalı Bilgi")
 
 if not st.session_state['giris_yapildi']:
     giris_ekrani()
@@ -163,62 +163,29 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
-# --- FİYAT ÇEKME MOTORU (V43.0) ---
-def turkce_karakter_duzelt(text):
-    text = text.lower()
-    replacements = {'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', 'İ': 'i', 'Ğ': 'g', 'Ü': 'u', 'Ş': 's', 'Ö': 'o', 'Ç': 'c'}
-    for src, target in replacements.items():
-        text = text.replace(src, target)
-    return text
-
-@st.cache_data(ttl=3600)
-def fiyat_cek_garanti(sehir):
-    try:
-        sehir_slug = turkce_karakter_duzelt(sehir)
-        url = f"https://kur.doviz.com/akaryakit-fiyatlari/{sehir_slug}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=4)
-        if response.status_code == 200:
-            dfs = pd.read_html(response.content)
-            for df in dfs:
-                if "Petrol Ofisi" in str(df) or "PETROL OFİSİ" in str(df):
-                    for index, row in df.iterrows():
-                        if "petrol ofisi" in str(row.values).lower():
-                            values = [str(x).replace('TL', '').replace(',', '.').strip() for x in row if isinstance(x, (int, float, str))]
-                            for val in values:
-                                try:
-                                    fiyat = float(val)
-                                    if 35 < fiyat < 60: return fiyat
-                                except: continue
-    except: pass
-    return 0.0
-
-# --- WORD & PDF FORMATLAMA ---
-def tr_upper(text):
-    return str(text).replace('i', 'İ').replace('ı', 'I').upper() if text else ""
-
-def tr_title(text):
-    if not text: return ""
-    return " ".join([w[0].replace('i','İ').replace('ı','I').upper() + w[1:].replace('I','ı').replace('İ','i').lower() for w in str(text).split() if w])
-
-def tr_pdf(text):
-    replacements = {'ğ':'g','Ğ':'G','ü':'u','Ü':'U','ş':'s','Ş':'S','ı':'i','İ':'I','ö':'o','Ö':'O','ç':'c','Ç':'C'}
-    for k,v in replacements.items(): text = text.replace(k, v)
-    return text
-
+# --- WORD TEKLİF OLUŞTURUCU ---
 def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         doc = DocxTemplate(SABLON_DOSYASI)
         context = {
-            'firma_adi': tr_upper(firma_adi), 'yetkili': tr_title(yetkili),
-            'iskonto_pompa': f"% {iskonto_pompa}", 'iskonto_istasyon': f"% {iskonto_istasyon}",
-            'odeme_sekli': str(odeme_sekli), 'tarih': datetime.now().strftime("%d.%m.%Y")
+            'firma_adi': str(firma_adi).upper(), 
+            'yetkili': str(yetkili).title(),
+            'iskonto_pompa': f"% {iskonto_pompa}",       
+            'iskonto_istasyon': f"% {iskonto_istasyon}", 
+            'odeme_sekli': str(odeme_sekli), 
+            'tarih': datetime.now().strftime("%d.%m.%Y")
         }
         doc.render(context)
         bio = io.BytesIO()
         doc.save(bio)
         return bio.getvalue()
     except: return None
+
+# --- PDF TEKLİF OLUŞTURUCU ---
+def tr_pdf(text):
+    replacements = {'ğ':'g','Ğ':'G','ü':'u','Ü':'U','ş':'s','Ş':'S','ı':'i','İ':'I','ö':'o','Ö':'O','ç':'c','Ç':'C'}
+    for k,v in replacements.items(): text = text.replace(k, v)
+    return text
 
 def pdf_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
@@ -258,7 +225,8 @@ def get_google_sheet_client():
         import json
         creds_dict = json.loads(creds_dict["info"])
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    return gspread.authorize(creds)
+    client = gspread.authorize(creds)
+    return client
 
 @st.cache_data(ttl=10)
 def veri_tabanini_yukle():
@@ -342,62 +310,86 @@ def detay_getir(place_id):
         return r.get('formatted_phone_number', ''), r.get('website', ''), r.get('url', '')
     except: return "", "", ""
 
-# --- ANA EKRAN ---
-col_logo, col_menu = st.columns([1, 6])
-with col_logo:
-    st.image(LOGO_URL, width=60)
-with col_menu:
+# --- YAN MENÜ (SIDEBAR) ---
+with st.sidebar:
+    st.image(LOGO_URL, width=140)
+    st.write("")
+    
     selected = option_menu(
-        menu_title=None,
+        menu_title="Ana Menü",
         options=["Pano", "Firma Bul", "Müşteriler", "Teklif & Hesap", "Ajanda"],
         icons=["speedometer2", "search", "person-badge", "file-earmark-text", "calendar-week"],
         default_index=0,
-        orientation="horizontal",
         styles={
-            "container": {"padding": "0!important", "background-color": "white", "border-radius": "10px"},
-            "icon": {"color": "#e30613", "font-size": "14px"}, 
-            "nav-link": {"font-size": "12px", "text-align": "center", "margin":"0px", "--hover-color": "#eee"},
-            "nav-link-selected": {"background-color": "#e30613", "color": "white"},
+            "container": {"padding": "0!important", "background-color": "transparent"},
+            "icon": {"color": "#e30613", "font-size": "16px"}, 
+            "nav-link": {"font-size": "14px", "text-align": "left", "margin":"5px", "--hover-color": "#eee"},
+            "nav-link-selected": {"background-color": "#e30613", "color": "white", "border-radius": "8px"},
         }
     )
-
-st.write("") 
+    st.markdown("---")
+    st.link_button("⛽ Fiyat Listesi", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", use_container_width=True)
+    
+    if st.button("Çıkış Yap", use_container_width=True):
+        st.session_state['giris_yapildi'] = False
+        st.rerun()
 
 # --- PANO ---
 if selected == "Pano":
-    tarih_str = datetime.now().strftime("%d %B %Y")
-    st.markdown(f"""
-    <div class="hero-card">
-        <div class="hero-title">👋 Merhaba, Müdürüm</div>
-        <div class="hero-subtitle">📅 {tarih_str} | Saha Operasyon Paneli</div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("""<h3 style='margin-bottom:20px;'>📊 Yönetim Paneli</h3>""", unsafe_allow_html=True)
     
     df = veri_tabanini_yukle()
     if not df.empty:
-        c1, c2, c3 = st.columns(3)
-        c1.markdown(f"""<div class="kpi-card"><div class="kpi-value">{len(df)}</div><div class="kpi-label">Toplam Müşteri</div></div>""", unsafe_allow_html=True)
-        c2.markdown(f"""<div class="kpi-card" style="border-bottom-color: #f59e0b;"><div class="kpi-value" style="color:#f59e0b">{len(df[df["Durum"] == "Yeni"])}</div><div class="kpi-label">Bekleyen</div></div>""", unsafe_allow_html=True)
-        c3.markdown(f"""<div class="kpi-card" style="border-bottom-color: #10b981;"><div class="kpi-value" style="color:#10b981">{len(df[df["Durum"] == "✅ Anlaşıldı"])}</div><div class="kpi-label">Başarılı</div></div>""", unsafe_allow_html=True)
+        # KPI Alanı
+        col1, col2, col3 = st.columns(3)
+        col1.markdown(f"""<div class="kpi-box"><div class="kpi-value">{len(df)}</div><div class="kpi-label">TOPLAM MÜŞTERİ</div></div>""", unsafe_allow_html=True)
+        col2.markdown(f"""<div class="kpi-box" style="border-left-color:#f59e0b;"><div class="kpi-value" style="color:#f59e0b">{len(df[df["Durum"] == "Yeni"])}</div><div class="kpi-label">BEKLEYEN</div></div>""", unsafe_allow_html=True)
+        col3.markdown(f"""<div class="kpi-box" style="border-left-color:#10b981;"><div class="kpi-value" style="color:#10b981">{len(df[df["Durum"] == "✅ Anlaşıldı"])}</div><div class="kpi-label">BAŞARILI</div></div>""", unsafe_allow_html=True)
         
         st.write("")
-        st.markdown("##### 📋 Son Hareketler")
-        son_5 = df.tail(5)[["Firma", "Durum", "Yetkili_Kisi"]].iloc[::-1]
-        st.dataframe(son_5, hide_index=True, use_container_width=True)
-    else: st.info("Veri yükleniyor...")
+        
+        # Grafik ve Liste (Grid Layout)
+        c_grafik, c_liste = st.columns([1, 1.5])
+        
+        with c_grafik:
+            st.markdown('<div class="card-container">', unsafe_allow_html=True)
+            st.markdown("##### 📈 Durum Analizi")
+            durum_counts = df["Durum"].value_counts().reset_index()
+            durum_counts.columns = ["Durum", "Adet"]
+            fig = px.pie(durum_counts, values="Adet", names="Durum", hole=0.7, color_discrete_sequence=px.colors.qualitative.Bold)
+            fig.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0), height=200)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+        with c_liste:
+            st.markdown('<div class="card-container">', unsafe_allow_html=True)
+            st.markdown("##### 🔔 Acil Bildirimler")
+            bugun = pd.Timestamp.now().normalize()
+            if "Hatirlatici_Tarih" in df.columns:
+                isler = df[(df["Hatirlatici_Tarih"] <= bugun) & (df["Durum"] != "✅ Anlaşıldı")]
+                if not isler.empty:
+                    for i, r in isler.iterrows():
+                        st.error(f"📞 **{r['Firma']}**: {r['Notlar']}")
+                else:
+                    st.success("Bugün için acil bir iş yok.")
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+    else:
+        st.info("Veri yükleniyor...")
 
 # --- FİRMA BUL ---
 elif selected == "Firma Bul":
-    st.markdown("#### 🗺️ Pazar Taraması")
-    with st.expander("📍 Arama Ayarları", expanded=True):
+    st.markdown("### 🗺️ Hedef Pazar Analizi")
+    
+    with st.container():
         c1, c2 = st.columns(2)
         sehir = c1.text_input("Şehir", "Gaziantep", placeholder="Şehir")
         sektor_key = c2.selectbox("Sektör", list(SEKTORLER.keys()))
-        tara_btn = st.button("🚀 Firmaları Tara", type="primary", use_container_width=True)
+        tara_btn = st.button("🚀 Taramayı Başlat", type="primary", use_container_width=True)
 
     if tara_btn:
         arama_sorgusu = SEKTORLER[sektor_key]
-        st.toast("Aranıyor...", icon="⏳")
+        st.toast("Veriler çekiliyor...", icon="⏳")
         tum_firmalar = []
         next_page_token = None
         sayfa = 0
@@ -431,9 +423,12 @@ elif selected == "Firma Bul":
 
     if 'sonuclar' in st.session_state:
         df_res = st.session_state['sonuclar']
-        with st.expander("📍 Harita Görünümü"):
+        with st.expander("📍 Harita Görünümü", expanded=False):
             st.map(df_res.dropna(subset=['lat','lon']), latitude='lat', longitude='lon', color='#ff0000')
+        
+        st.write("### 📋 Firma Listesi")
         edited = st.data_editor(df_res, column_config={"Seç": st.column_config.CheckboxColumn("Ekle", default=False)}, hide_index=True, use_container_width=True)
+        
         if st.button("💾 SEÇİLENLERİ KAYDET", type="primary", use_container_width=True):
             secilenler = edited[edited["Seç"]==True].drop(columns=["Seç", "lat", "lon"], errors='ignore')
             if not secilenler.empty:
@@ -449,29 +444,36 @@ elif selected == "Firma Bul":
 
 # --- TAB 3: MÜŞTERİLER ---
 elif selected == "Müşteriler":
-    st.markdown("#### 👥 Müşteri Portföyü")
+    st.markdown("### 👥 Müşteri Portföyü")
     df = veri_tabanini_yukle()
     
     if not df.empty:
+        # Filtreleme Kutusu
         with st.expander("🌪️ Filtreleme & Arama", expanded=False):
             c1, c2 = st.columns(2)
             f_durum = c1.multiselect("Durum", df["Durum"].unique()) if not df.empty else []
             f_sektor = c2.multiselect("Sektör", df["Firma_Sektoru"].unique()) if not df.empty else []
+        
+        df_show = df.copy()
+        if f_durum: df_show = df_show[df_show["Durum"].isin(f_durum)]
+        if f_sektor: df_show = df_show[df_show["Firma_Sektoru"].isin(f_sektor)]
     
-    df_show = df.copy()
-    if f_durum: df_show = df_show[df_show["Durum"].isin(f_durum)]
-    if f_sektor: df_show = df_show[df_show["Firma_Sektoru"].isin(f_sektor)]
-
-    mode = st.radio("İşlem:", ["📂 Düzenle", "➕ Yeni Ekle"], horizontal=True, label_visibility="collapsed")
+    # Mod Seçimi
+    mode = st.radio("", ["📂 Düzenle", "➕ Yeni Ekle"], horizontal=True)
     st.write("")
     
     if mode == "📂 Düzenle":
         if not df_show.empty:
-            arama_terimi = st.selectbox("Müşteri Seç:", df_show["Firma"].tolist())
+            arama_terimi = st.selectbox("Müşteri Seçiniz:", df_show["Firma"].tolist())
             secilen_veri = df[df["Firma"] == arama_terimi].iloc[0]
             idx = df[df["Firma"] == arama_terimi].index[0]
             
-            st.markdown(f"""<div class="customer-card"><h3 style="margin:0; color:#e30613;">🏢 {secilen_veri['Firma']}</h3></div>""", unsafe_allow_html=True)
+            # KART GÖRÜNÜMÜ
+            st.markdown(f"""
+            <div class="card-container" style="border-left: 5px solid #e30613;">
+                <h3 style="margin:0; color:#111827;">🏢 {secilen_veri['Firma']}</h3>
+            </div>
+            """, unsafe_allow_html=True)
             
             with st.form("musteri_duzenle"):
                 c1, c2 = st.columns(2)
@@ -488,52 +490,53 @@ elif selected == "Müşteriler":
                     yeni_tuketim = st.text_input("Tüketim (m3/Ton)", value=secilen_veri.get('Tuketim_Bilgisi', ''))
                     yeni_iskonto = st.text_input("💸 İskonto (%)", value=secilen_veri.get('Iskonto_Orani', ''))
                     
-                    st.write("🗓️ **Randevu**")
-                    col_d, col_t = st.columns(2)
+                    # Tarih/Saat
+                    c_d, c_t = st.columns(2)
                     val_hatirlat_tar = secilen_veri.get('Hatirlatici_Tarih')
                     if pd.isna(val_hatirlat_tar): val_hatirlat_tar = None
-                    yeni_hatirlat_tar = col_date.date_input("Tarih", value=val_hatirlat_tar)
+                    yeni_hatirlat_tar = c_d.date_input("Randevu Tarihi", value=val_hatirlat_tar)
+                    
                     val_hatirlat_saat = secilen_veri.get('Hatirlatici_Saat', '09:00')
                     try: time_obj = datetime.strptime(str(val_hatirlat_saat), '%H:%M').time()
                     except: time_obj = datetime.strptime('09:00', '%H:%M').time()
-                    yeni_hatirlat_saat = col_time.time_input("Saat", value=time_obj)
+                    yeni_hatirlat_saat = c_t.time_input("Saat", value=time_obj)
 
                 yeni_adres = st.text_area("Adres", value=secilen_veri['Adres'], height=60)
-                yeni_konum = st.text_input("📍 Konum Linki", value=secilen_veri.get('Konum_Linki', ''))
+                yeni_konum = st.text_input("📍 Konum Linki (Google Maps)", value=secilen_veri.get('Konum_Linki', ''))
                 yeni_dosya = st.text_input("📄 Dosya Linki", value=secilen_veri.get('Dosya_Linki', ''))
                 yeni_not = st.text_area("Görüşme Notları", value=secilen_veri['Notlar'])
                 
-                col_b1, col_b2, col_b3, col_b4 = st.columns(4)
-                if arama_linki_yap(yeni_tel): col_b1.link_button("📞 Ara", arama_linki_yap(yeni_tel), use_container_width=True)
-                if whatsapp_linki_yap(yeni_tel): col_b2.link_button("💬 WP", whatsapp_linki_yap(yeni_tel), use_container_width=True)
+                # BUTONLAR (Linkler)
+                cb1, cb2, cb3, cb4 = st.columns(4)
+                if arama_linki_yap(yeni_tel): cb1.link_button("📞 Ara", arama_linki_yap(yeni_tel), use_container_width=True)
+                if whatsapp_linki_yap(yeni_tel): cb2.link_button("💬 WP", whatsapp_linki_yap(yeni_tel), use_container_width=True)
                 nav_link = navigasyon_linki_yap(yeni_adres, yeni_konum)
-                if nav_link: col_b3.link_button("🗺️ Yol", nav_link, use_container_width=True)
+                if nav_link: cb3.link_button("🗺️ Yol", nav_link, use_container_width=True)
                 cal_link = google_calendar_link(f"Görüşme: {secilen_veri['Firma']}", yeni_hatirlat_tar, yeni_hatirlat_saat.strftime('%H:%M'), yeni_adres, yeni_not)
-                if cal_link: col_b4.link_button("📅 Takvim", cal_link, use_container_width=True)
+                if cal_link: cb4.link_button("📅 Takvim", cal_link, use_container_width=True)
                 
                 if yeni_dosya and "http" in yeni_dosya:
                     st.link_button("📂 Dosyayı Aç", yeni_dosya, type="secondary", use_container_width=True)
                 
-                kaydet_btn = st.form_submit_button("💾 Kaydet", type="primary", use_container_width=True)
-            
-            if kaydet_btn:
-                df.at[idx, 'Yetkili_Kisi'] = yeni_yetkili
-                df.at[idx, 'Telefon'] = yeni_tel
-                df.at[idx, 'Email'] = yeni_email
-                df.at[idx, 'Adres'] = yeni_adres
-                df.at[idx, 'Durum'] = yeni_durum
-                df.at[idx, 'Tuketim_Bilgisi'] = yeni_tuketim
-                df.at[idx, 'Arac_Sayisi'] = yeni_arac
-                df.at[idx, 'Konum_Linki'] = yeni_konum
-                df.at[idx, 'Iskonto_Orani'] = yeni_iskonto
-                df.at[idx, 'Dosya_Linki'] = yeni_dosya
-                df.at[idx, 'Hatirlatici_Tarih'] = pd.to_datetime(yeni_hatirlat_tar)
-                df.at[idx, 'Hatirlatici_Saat'] = yeni_hatirlat_saat.strftime('%H:%M')
-                df.at[idx, 'Notlar'] = yeni_not
-                veriyi_kaydet(df)
-                st.success("✅ Güncellendi!")
-                time.sleep(1)
-                st.rerun()
+                st.write("")
+                if st.form_submit_button("💾 Değişiklikleri Kaydet", type="primary", use_container_width=True):
+                    df.at[idx, 'Yetkili_Kisi'] = yeni_yetkili
+                    df.at[idx, 'Telefon'] = yeni_tel
+                    df.at[idx, 'Email'] = yeni_email
+                    df.at[idx, 'Adres'] = yeni_adres
+                    df.at[idx, 'Durum'] = yeni_durum
+                    df.at[idx, 'Tuketim_Bilgisi'] = yeni_tuketim
+                    df.at[idx, 'Arac_Sayisi'] = yeni_arac
+                    df.at[idx, 'Konum_Linki'] = yeni_konum
+                    df.at[idx, 'Iskonto_Orani'] = yeni_iskonto
+                    df.at[idx, 'Dosya_Linki'] = yeni_dosya
+                    df.at[idx, 'Hatirlatici_Tarih'] = pd.to_datetime(yeni_hatirlat_tar)
+                    df.at[idx, 'Hatirlatici_Saat'] = yeni_hatirlat_saat.strftime('%H:%M')
+                    df.at[idx, 'Notlar'] = yeni_not
+                    veriyi_kaydet(df)
+                    st.success("✅ Güncellendi!")
+                    time.sleep(1)
+                    st.rerun()
 
             if st.button("🗑️ Sil", type="secondary", use_container_width=True):
                 df = df.drop(idx)
@@ -542,7 +545,7 @@ elif selected == "Müşteriler":
         else: st.info("Listeniz boş.")
 
     elif mode == "➕ Yeni Ekle":
-        st.markdown("""<div class="customer-card"><h4>✨ Yeni Müşteri</h4></div>""", unsafe_allow_html=True)
+        st.markdown("""<div class="card-container"><h4>✨ Yeni Müşteri Kartı</h4></div>""", unsafe_allow_html=True)
         with st.form("yeni_ekle"):
             firma_adi = st.text_input("🏢 Firma Adı (Zorunlu)")
             c1, c2 = st.columns(2)
@@ -591,10 +594,10 @@ elif selected == "Müşteriler":
 
 # --- YENİ TAB: TEKLİF & HESAP ---
 elif selected == "Teklif & Hesap":
-    st.markdown("#### 🧮 Hesaplama & Teklif")
+    st.markdown("### 🧮 Hesaplama & Teklif")
     
     # Fiyat Linki (En tepede)
-    st.link_button("⛽ RESMİ FİYAT LİSTESİ", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
+    st.link_button("⛽ RESMİ FİYAT LİSTESİ (Yeni Sekme)", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
     st.write("")
     
     tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word & PDF Teklif"])
@@ -602,7 +605,7 @@ elif selected == "Teklif & Hesap":
     with tab_hesap:
         # MANUEL FİYAT GİRİŞİ
         if 'manual_price' not in st.session_state: st.session_state['manual_price'] = 44.50 
-        guncel_fiyat_giris = st.number_input("⛽ BÖLGE POMPA FİYATI (TL):", value=st.session_state['manual_price'], step=0.10)
+        guncel_fiyat_giris = st.number_input("⛽ GÜNCEL POMPA FİYATI (TL):", value=st.session_state['manual_price'], step=0.10)
         st.session_state['manual_price'] = guncel_fiyat_giris 
 
         st.markdown("---")
@@ -630,11 +633,11 @@ elif selected == "Teklif & Hesap":
             
             with col_res1:
                 st.markdown(f"""
-                <div class='compare-box' style='background:#e0f2fe; border:1px solid #7dd3fc;'>
+                <div style='background:#e0f2fe; padding:15px; border-radius:10px; border:1px solid #7dd3fc; text-align:center;'>
                     <h4>⛽ Pompa (%{iskonto_orani})</h4>
-                    <div class='price-tag' style='color:#0369a1;'>{indirimli_pompa:,.2f} TL</div>
-                    <small>İndirimli Litre Fiyatı</small>
-                    <hr style='margin:10px 0; opacity:0.3;'>
+                    <div style='font-size:1.5rem; font-weight:bold; color:#0369a1;'>{indirimli_pompa:,.2f} TL</div>
+                    <small>İndirimli Litre</small>
+                    <hr style='opacity:0.3;'>
                     <p>Aylık Kazanç: <b>{aylik_kazanc_pompa:,.2f} TL</b></p>
                     <p>Yıllık Kazanç: <b>{yillik_kazanc_pompa:,.2f} TL</b></p>
                 </div>
@@ -642,11 +645,11 @@ elif selected == "Teklif & Hesap":
                 
             with col_res2:
                 st.markdown(f"""
-                <div class='compare-box' style='background:#dcfce7; border:1px solid #86efac;'>
-                    <h4>🏪 Anlaşmalı İst. (%{iskonto_anlasmali})</h4>
-                    <div class='price-tag' style='color:#15803d;'>{indirimli_ist:,.2f} TL</div>
-                    <small>İndirimli Litre Fiyatı</small>
-                    <hr style='margin:10px 0; opacity:0.3;'>
+                <div style='background:#dcfce7; padding:15px; border-radius:10px; border:1px solid #86efac; text-align:center;'>
+                    <h4>🏪 İstasyon (%{iskonto_anlasmali})</h4>
+                    <div style='font-size:1.5rem; font-weight:bold; color:#15803d;'>{indirimli_ist:,.2f} TL</div>
+                    <small>İndirimli Litre</small>
+                    <hr style='opacity:0.3;'>
                     <p>Aylık Kazanç: <b>{aylik_kazanc_ist:,.2f} TL</b></p>
                     <p>Yıllık Kazanç: <b>{yillik_kazanc_ist:,.2f} TL</b></p>
                 </div>
@@ -676,18 +679,24 @@ elif selected == "Teklif & Hesap":
         if generate_btn:
             if p_firma:
                 col_d1, col_d2 = st.columns(2)
-                # Word
+                # 1. WORD
                 try:
                     word_bytes = word_teklif_olustur(p_firma, p_iskonto_pompa, p_iskonto_istasyon, p_odeme, p_yetkili)
-                    if word_bytes: col_d1.download_button("📥 WORD İNDİR", word_bytes, f"{p_firma}_Teklif.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", type="primary")
-                    else: col_d1.error("Şablon Yok!")
-                except: col_d1.error("Word Hatası")
+                    if word_bytes:
+                        col_d1.download_button("📥 WORD İNDİR", word_bytes, f"{p_firma}_Teklif.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", type="primary")
+                    else:
+                        col_d1.error("Şablon Yok!")
+                except Exception as e: col_d1.error(f"Word Hatası: {e}")
 
-                # PDF
+                # 2. PDF
                 try:
                     pdf_bytes = pdf_teklif_olustur(p_firma, p_iskonto_pompa, p_iskonto_istasyon, p_odeme, p_yetkili)
-                    if pdf_bytes: col_d2.download_button("📥 PDF İNDİR", pdf_bytes, f"{p_firma}_Teklif.pdf", "application/pdf", type="secondary")
-                except: col_d2.error("PDF Hatası")
+                    if pdf_bytes:
+                        col_d2.download_button("📥 PDF İNDİR", pdf_bytes, f"{p_firma}_Teklif.pdf", "application/pdf", type="secondary")
+                    else:
+                        col_d2.error("PDF Oluşturulamadı")
+                except Exception as e: col_d2.error(f"PDF Hatası: {e}")
+
             else: st.error("Firma adı giriniz.")
 
 # --- AJANDA ---
@@ -716,4 +725,3 @@ elif selected == "Bildirim":
                 saat = f"⏰ {r.get('Hatirlatici_Saat', '')}" if r.get('Hatirlatici_Saat') else ""
                 st.error(f"⚠️ **{r['Firma']}**: {r['Notlar']} ({saat})")
         else: st.info("Temiz.")
-
