@@ -223,7 +223,6 @@ st.write("")
 if selected == "Pano":
     tarih_str = datetime.now().strftime("%d %B %Y")
     st.markdown(f"""<div class="hero-card"><h3>👋 Merhaba, Müdürüm</h3><p>{tarih_str} | Saha Operasyon Paneli</p></div>""", unsafe_allow_html=True)
-    st.link_button("⛽ GÜNCEL AKARYAKIT FİYATLARI", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
     
     df = veri_tabanini_yukle()
     if not df.empty:
@@ -341,7 +340,7 @@ elif selected == "Müşteriler":
                     yeni_tuketim = st.text_input("Tüketim", value=secilen_veri.get('Tuketim_Bilgisi', ''))
                     yeni_iskonto = st.text_input("💸 İskonto (%)", value=secilen_veri.get('Iskonto_Orani', ''))
                     
-                    st.write("🗓️ **Randevu**")
+                    st.write("🗓️ **Randevu & Bildirim**")
                     col_date, col_time = st.columns(2)
                     val_hatirlat_tar = secilen_veri.get('Hatirlatici_Tarih')
                     if pd.isna(val_hatirlat_tar): val_hatirlat_tar = None
@@ -354,7 +353,7 @@ elif selected == "Müşteriler":
                 yeni_adres = st.text_area("Adres", value=secilen_veri['Adres'], height=60)
                 yeni_konum = st.text_input("📍 Konum Linki", value=secilen_veri.get('Konum_Linki', ''))
                 yeni_dosya = st.text_input("📄 Dosya Linki", value=secilen_veri.get('Dosya_Linki', ''))
-                yeni_not = st.text_area("Notlar", value=secilen_veri['Notlar'])
+                yeni_not = st.text_area("Görüşme Notları", value=secilen_veri['Notlar'])
                 
                 col_b1, col_b2, col_b3, col_b4 = st.columns(4)
                 if arama_linki_yap(yeni_tel): col_b1.link_button("📞 Ara", arama_linki_yap(yeni_tel), use_container_width=True)
@@ -443,9 +442,12 @@ elif selected == "Müşteriler":
                 st.rerun()
             else: st.error("Firma Adı zorunlu.")
 
-# --- YENİ TAB: TEKLİF & HESAP ---
+# --- TEKLİF & HESAP ---
 elif selected == "Teklif & Hesap":
     st.markdown("#### 🧮 Hesaplama & Teklif")
+    st.link_button("⛽ GÜNCEL AKARYAKIT FİYATLARI", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
+    st.write("")
+    
     tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word Teklif Oluştur"])
     
     with tab_hesap:
@@ -459,19 +461,15 @@ elif selected == "Teklif & Hesap":
         
         st.markdown("---")
         if aylik_litre > 0:
-            # POMPA İSKONTOSU HESABI
             indirimli_pompa = guncel_fiyat * (1 - (iskonto_orani/100))
             aylik_kazanc_pompa = (guncel_fiyat - indirimli_pompa) * aylik_litre
             yillik_kazanc_pompa = aylik_kazanc_pompa * 12
             
-            # ANLAŞMALI İSTASYON HESABI
             indirimli_ist = guncel_fiyat * (1 - (iskonto_anlasmali/100))
             aylik_kazanc_ist = (guncel_fiyat - indirimli_ist) * aylik_litre
             yillik_kazanc_ist = aylik_kazanc_ist * 12
             
-            # SONUÇLARI YAN YANA GÖSTER (KARŞILAŞTIRMA)
             col_res1, col_res2 = st.columns(2)
-            
             with col_res1:
                 st.markdown(f"""
                 <div class='compare-box' style='background:#e0f2fe; border:1px solid #7dd3fc;'>
@@ -483,7 +481,6 @@ elif selected == "Teklif & Hesap":
                     <p>Yıllık Kazanç: <b>{yillik_kazanc_pompa:,.2f} TL</b></p>
                 </div>
                 """, unsafe_allow_html=True)
-                
             with col_res2:
                 st.markdown(f"""
                 <div class='compare-box' style='background:#dcfce7; border:1px solid #86efac;'>
