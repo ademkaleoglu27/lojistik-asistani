@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from streamlit_option_menu import option_menu
-from docxtpl import DocxTemplate # Word Şablon Kütüphanesi
+from docxtpl import DocxTemplate
 import io
 
 # --- 1. SAYFA VE TASARIM AYARLARI ---
@@ -61,7 +61,6 @@ if not st.session_state['giris_yapildi']:
 # --- SABİTLER ---
 SHEET_ADI = "Lojistik_Verileri"
 API_KEY = "AIzaSyCw0bhZ2WTrZtThjgJBMsbjZ7IDh6QN0Og" 
-# Şablon dosyasının adı (GitHub'a yüklediğinle aynı olmalı)
 SABLON_DOSYASI = "teklif_sablonu.docx" 
 
 SEKTORLER = {
@@ -71,20 +70,19 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
-# --- WORD TEKLİF OLUŞTURUCU ---
-def word_teklif_olustur(firma_adi, iskonto, vade, yetkili):
+# --- WORD TEKLİF OLUŞTURUCU (GÜNCELLENDİ) ---
+def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         doc = DocxTemplate(SABLON_DOSYASI)
         context = {
             'firma_adi': firma_adi,
             'yetkili': yetkili,
-            'iskonto': iskonto,
-            'vade': vade,
+            'iskonto_pompa': iskonto_pompa,       # YENİ
+            'iskonto_istasyon': iskonto_istasyon, # YENİ
+            'odeme_sekli': odeme_sekli,           # YENİ (Vade yerine)
             'tarih': datetime.now().strftime("%d.%m.%Y")
         }
         doc.render(context)
-        
-        # Dosyayı hafızaya kaydet (Diske değil)
         bio = io.BytesIO()
         doc.save(bio)
         return bio.getvalue()
@@ -131,8 +129,7 @@ def veriyi_kaydet(df):
         sheet = client.open(SHEET_ADI).sheet1
         df_save = df.copy()
         for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi", "Ziyaret_Tarihi"]:
-            if col in df_save.columns:
-                df_save[col] = pd.to_datetime(df_save[col], errors='coerce').dt.strftime('%Y-%m-%d')
+            if col in df_save.columns: df_save[col] = pd.to_datetime(df_save[col], errors='coerce').dt.strftime('%Y-%m-%d')
         df_save = df_save.fillna("")
         sheet.clear()
         sheet.update([df_save.columns.values.tolist()] + df_save.values.tolist())
@@ -315,7 +312,7 @@ elif selected == "Müşteriler":
             with st.form("musteri_duzenle"):
                 c1, c2 = st.columns(2)
                 with c1:
-                    yeni_yetkili = st.text_input("👤 Yetkili", value=secilen_veri.get('Yetkili_Kisi', ''))
+                    yeni_yetkili = st.text_input("👤 Yetkili İsim", value=secilen_veri.get('Yetkili_Kisi', ''))
                     yeni_tel = st.text_input("📞 Telefon", value=secilen_veri['Telefon'])
                     yeni_email = st.text_input("📧 Email", value=secilen_veri['Email'])
                     yeni_arac = st.text_input("🚛 Araç Sayısı", value=secilen_veri.get('Arac_Sayisi', ''))
@@ -325,10 +322,11 @@ elif selected == "Müşteriler":
                     try: m_idx = durum_listesi.index(secilen_veri['Durum'])
                     except: m_idx = 0
                     yeni_durum = st.selectbox("Durum", durum_listesi, index=m_idx)
-                    yeni_tuketim = st.text_input("Tüketim", value=secilen_veri.get('Tuketim_Bilgisi', ''))
+                    yeni_tuketim = st.text_input("Tüketim (m3/Ton)", value=secilen_veri.get('Tuketim_Bilgisi', ''))
+                    # İSKONTO ALANI
                     yeni_iskonto = st.text_input("💸 İskonto (%)", value=secilen_veri.get('Iskonto_Orani', ''))
                     
-                    st.write("🗓️ **Randevu**")
+                    st.write("🗓️ **Randevu & Bildirim**")
                     col_date, col_time = st.columns(2)
                     val_hatirlat_tar = secilen_veri.get('Hatirlatici_Tarih')
                     if pd.isna(val_hatirlat_tar): val_hatirlat_tar = None
@@ -339,7 +337,7 @@ elif selected == "Müşteriler":
                     yeni_hatirlat_saat = col_time.time_input("Saat", value=time_obj)
 
                 yeni_adres = st.text_area("Adres", value=secilen_veri['Adres'], height=60)
-                yeni_konum = st.text_input("📍 Konum (Link)", value=secilen_veri.get('Konum_Linki', ''))
+                yeni_konum = st.text_input("📍 Konum Linki", value=secilen_veri.get('Konum_Linki', ''))
                 yeni_dosya = st.text_input("📄 Dosya Linki", value=secilen_veri.get('Dosya_Linki', ''))
                 yeni_not = st.text_area("Notlar", value=secilen_veri['Notlar'])
                 
@@ -347,7 +345,7 @@ elif selected == "Müşteriler":
                 if arama_linki_yap(yeni_tel): col_b1.link_button("📞", arama_linki_yap(yeni_tel), use_container_width=True)
                 if whatsapp_linki_yap(yeni_tel): col_b2.link_button("💬", whatsapp_linki_yap(yeni_tel), use_container_width=True)
                 nav_link = navigasyon_linki_yap(yeni_adres, yeni_konum)
-                if nav_link: col_b3.link_button("🗺️ Yol", nav_link, use_container_width=True)
+                if nav_link: col_b3.link_button("🗺️", nav_link, use_container_width=True)
                 cal_link = google_calendar_link(f"Görüşme: {secilen_veri['Firma']}", yeni_hatirlat_tar, yeni_hatirlat_saat.strftime('%H:%M'), yeni_adres, yeni_not)
                 if cal_link: col_b4.link_button("📅", cal_link, use_container_width=True)
                 
@@ -441,10 +439,12 @@ elif selected == "Teklif & Hesap":
             aylik_litre = st.number_input("Aylık Tüketim (Litre)", min_value=0, value=1000)
             guncel_fiyat = st.number_input("Pompa Fiyatı (TL)", value=40.0)
         with c2:
-            iskonto_orani = st.number_input("Verilecek İskonto (%)", min_value=0.0, max_value=15.0, value=3.0)
+            iskonto_orani = st.number_input("Pompa İskonto (%)", min_value=0.0, max_value=15.0, value=3.0)
+            iskonto_anlasmali = st.number_input("Anlaşmalı İstasyon İskonto (%)", min_value=0.0, max_value=15.0, value=0.0)
         
         st.markdown("---")
         if aylik_litre > 0:
+            # Hesaplama (Pompa üzerinden)
             indirimli_fiyat = guncel_fiyat * (1 - (iskonto_orani/100))
             aylik_kazanc = (guncel_fiyat - indirimli_fiyat) * aylik_litre
             yillik_kazanc = aylik_kazanc * 12
@@ -455,18 +455,33 @@ elif selected == "Teklif & Hesap":
             st.success(f"Müşteriye teklif edilecek fiyat: **{indirimli_fiyat:.2f} TL**")
 
     with tab_pdf:
-        st.info("👇 Word Şablonu Doldur (teklif_sablonu.docx gereklidir)")
+        st.info("👇 Word Şablonu Doldur (teklif_sablonu.docx gerekli)")
         with st.form("pdf_form"):
             p_firma = st.text_input("Firma Adı")
             p_yetkili = st.text_input("Yetkili")
-            p_iskonto = st.number_input("İskonto (%)", value=3.0)
-            p_vade = st.number_input("Vade (Gün)", value=30)
+            
+            # GÜNCELLENEN ALANLAR
+            col_pdf1, col_pdf2 = st.columns(2)
+            p_iskonto_pompa = col_pdf1.number_input("Pompa İskonto (%)", value=3.0)
+            p_iskonto_istasyon = col_pdf2.number_input("Anlaşmalı İst. İskonto (%)", value=0.0)
+            
+            # VADE SEÇENEKLERİ
+            odeme_secenekleri = [
+                "Fatura Kesiminden 5 Gün Sonra", 
+                "Fatura Kesiminden 10 Gün Sonra", 
+                "Fatura Kesiminden 15 Gün Sonra",
+                "Ayın 5'i", "Ayın 10'u", "Ayın 15'i", "Ayın 20'si", "Ayın 25'i",
+                "Ön Ödeme (Havale/EFT)", "Kredi Kartı ile Ödeme", "DBS (Doğrudan Borçlandırma)"
+            ]
+            p_odeme = st.selectbox("Ödeme/Vade Şekli", odeme_secenekleri)
+            
             generate_btn = st.form_submit_button("📄 Teklif Oluştur")
         
         if generate_btn:
             if p_firma:
                 try:
-                    word_bytes = word_teklif_olustur(p_firma, p_iskonto, p_vade, p_yetkili)
+                    # Fonksiyona yeni parametreleri gönder
+                    word_bytes = word_teklif_olustur(p_firma, p_iskonto_pompa, p_iskonto_istasyon, p_odeme, p_yetkili)
                     if word_bytes:
                         st.download_button("📥 WORD İNDİR", word_bytes, f"{p_firma}_Teklif.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", type="primary")
                     else:
