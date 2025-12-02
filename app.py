@@ -14,7 +14,7 @@ from docxtpl import DocxTemplate
 from fpdf import FPDF
 import io
 
-# --- 1. SAYFA VE TASARIM AYARLARI ---
+# --- 1. SAYFA AYARLARI ---
 st.set_page_config(
     page_title="Özkaraaslan Saha",
     page_icon="⛽", 
@@ -74,26 +74,31 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
-# --- FİYAT ÇEKME MOTORU ---
-def turkce_karakter_duzelt(text):
-    text = text.lower()
-    replacements = {'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', 'İ': 'i', 'Ğ': 'g', 'Ü': 'u', 'Ş': 's', 'Ö': 'o', 'Ç': 'c'}
-    for src, target in replacements.items(): text = text.replace(src, target)
-    return text
+# --- FONT DÜZELTME (PDF/WORD) ---
+def tr_upper(text):
+    if not text: return ""
+    return str(text).replace('i', 'İ').replace('ı', 'I').upper()
 
-# PDF İÇİN FONT DÜZELTME
+def tr_title(text):
+    if not text: return ""
+    words = str(text).split()
+    new = []
+    for w in words:
+        if len(w)>0: new.append(w[0].replace('i','İ').replace('ı','I').upper() + w[1:].replace('I','ı').replace('İ','i').lower())
+    return " ".join(new)
+
 def tr_pdf(text):
     replacements = {'ğ':'g','Ğ':'G','ü':'u','Ü':'U','ş':'s','Ş':'S','ı':'i','İ':'I','ö':'o','Ö':'O','ç':'c','Ç':'C'}
     for k,v in replacements.items(): text = text.replace(k, v)
     return text
 
-# --- WORD TEKLİF OLUŞTURUCU ---
+# --- WORD TEKLİF ---
 def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         doc = DocxTemplate(SABLON_DOSYASI)
         context = {
-            'firma_adi': str(firma_adi).upper(), 
-            'yetkili': str(yetkili),
+            'firma_adi': tr_upper(firma_adi), 
+            'yetkili': tr_title(yetkili),
             'iskonto_pompa': f"% {iskonto_pompa}",       
             'iskonto_istasyon': f"% {iskonto_istasyon}", 
             'odeme_sekli': str(odeme_sekli), 
@@ -105,7 +110,7 @@ def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli,
         return bio.getvalue()
     except: return None
 
-# --- PDF TEKLİF OLUŞTURUCU ---
+# --- PDF TEKLİF ---
 def pdf_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         pdf = FPDF()
@@ -477,17 +482,16 @@ elif selected == "Müşteriler":
 elif selected == "Teklif & Hesap":
     st.markdown("#### 🧮 Hesaplama & Teklif")
     
-    # Fiyat Linki (En tepede)
-    st.link_button("⛽ GÜNCEL FİYAT LİSTESİ (Yeni Sekme)", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
-    
+    # --- FİYAT LİSTESİ LİNKİ (YENİ YERİ) ---
+    st.link_button("⛽ RESMİ FİYAT LİSTESİ İÇİN TIKLA", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
     st.write("")
     
     tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word Teklif Oluştur"])
     
     with tab_hesap:
-        # MANUEL FİYAT GİRİŞİ
+        # MANUEL FİYAT GİRİŞİ (En Üstte)
         if 'manual_price' not in st.session_state: st.session_state['manual_price'] = 44.50 
-        guncel_fiyat_giris = st.number_input("⛽ LÜTFEN GÜNCEL POMPA FİYATINI GİRİN (TL):", value=st.session_state['manual_price'], step=0.10)
+        guncel_fiyat_giris = st.number_input("⛽ GÜNCEL POMPA FİYATI (TL)", value=st.session_state['manual_price'], step=0.10)
         st.session_state['manual_price'] = guncel_fiyat_giris 
 
         st.markdown("---")
