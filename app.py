@@ -10,7 +10,8 @@ from bs4 import BeautifulSoup
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from streamlit_option_menu import option_menu
-from fpdf import FPDF # PDF Kütüphanesi
+from docxtpl import DocxTemplate # Word Şablon Kütüphanesi
+import io
 
 # --- 1. SAYFA VE TASARIM AYARLARI ---
 st.set_page_config(
@@ -25,58 +26,12 @@ def local_css():
     st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
-        
-        html, body, [class*="css"] {
-            font-family: 'Roboto', sans-serif;
-            background-color: #f4f6f9;
-        }
-        
-        /* Karşılama Kartı */
-        .hero-card {
-            background: linear-gradient(135deg, #e30613 0%, #8a040b 100%);
-            padding: 20px;
-            border-radius: 15px;
-            color: white;
-            box-shadow: 0 8px 15px rgba(227, 6, 19, 0.2);
-            margin-bottom: 20px;
-        }
-        
-        /* Filtre Kutusu */
-        .filter-box {
-            background-color: white;
-            padding: 15px;
-            border-radius: 10px;
-            border: 1px solid #e5e7eb;
-            margin-bottom: 15px;
-        }
-        
-        /* Müşteri Kartı */
-        .customer-card { 
-            background-color: white; 
-            padding: 25px; 
-            border-radius: 15px; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
-            border-top: 5px solid #e30613; 
-            margin-bottom: 20px; 
-        }
-        
-        /* KPI */
-        .kpi-container {
-            background-color: white;
-            padding: 10px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            border-bottom: 3px solid #e30613;
-        }
+        html, body, [class*="css"] { font-family: 'Roboto', sans-serif; background-color: #f4f6f9; }
+        .hero-card { background: linear-gradient(135deg, #e30613 0%, #8a040b 100%); padding: 20px; border-radius: 15px; color: white; box-shadow: 0 8px 15px rgba(227, 6, 19, 0.2); margin-bottom: 20px; }
+        .kpi-container { background-color: white; padding: 10px; border-radius: 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-bottom: 3px solid #e30613; }
         .kpi-val { font-size: 1.4rem; font-weight: 700; color: #1f2937; }
-        
-        /* Butonlar */
         .stButton>button { border-radius: 8px; height: 45px; font-weight: 600; width: 100%; }
-        
-        /* Menü */
         .nav-link-selected { background-color: #e30613 !important; }
-        
         #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -105,8 +60,9 @@ if not st.session_state['giris_yapildi']:
 
 # --- SABİTLER ---
 SHEET_ADI = "Lojistik_Verileri"
-API_KEY = "AIzaSyCw0bhZ2WTrZtThjgJBMsbjZ7IDh6QN0Og"
-LOGO_URL = "https://www.ozkaraaslanfilo.com/wp-content/uploads/2021/01/logo.png"
+API_KEY = "AIzaSyCw0bhZ2WTrZtThjgJBMsbjZ7IDh6QN0Og" 
+# Şablon dosyasının adı (GitHub'a yüklediğinle aynı olmalı)
+SABLON_DOSYASI = "teklif_sablonu.docx" 
 
 SEKTORLER = {
     "🚛 Lojistik": "Lojistik Firmaları", "📦 Nakliye": "Yurt İçi Nakliye Firmaları", "🌍 Uluslararası": "Uluslararası Transport",
@@ -115,68 +71,25 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
-# --- PDF OLUŞTURMA ---
-def teklif_pdf_olustur(firma_adi, iskonto, vade, yetkili):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    
-    # Logo
-    try: pdf.image(LOGO_URL, x=10, y=8, w=50)
-    except: pass
-    pdf.ln(20)
-    
-    # Başlık
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, "YAKIT TEDARIK TEKLIFI", ln=True, align='C')
-    pdf.ln(10)
-    
-    # Tarih
-    pdf.set_font("Arial", size=10)
-    pdf.cell(0, 10, f"Tarih: {datetime.now().strftime('%d.%m.%Y')}", ln=True, align='R')
-    
-    # İçerik
-    pdf.set_font("Arial", size=12)
-    text = f"""
-    Sayin {firma_adi} Yetkilisi ({yetkili}),
-    
-    Ozkaraaslan Filo ve Petrol Ofisi guvencesiyle, firmanizin akaryakit ihtiyaclarini 
-    karsilamak adina hazirladigimiz ozel teklifimiz asagidaki gibidir.
-    
-    Filo Yonetim Sistemi (AutoMatic) ile araclariniz istasyonlarimizda 
-    ucret odemeden yakit alabilir, tum tuketimlerinizi tek faturada yonetebilirsiniz.
-    """
-    pdf.multi_cell(0, 7, text)
-    pdf.ln(10)
-    
-    # Tablo
-    pdf.set_fill_color(227, 6, 19)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(95, 10, "Hizmet", 1, 0, 'C', True)
-    pdf.cell(95, 10, "Teklif Kosullari", 1, 1, 'C', True)
-    
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Arial", size=12)
-    pdf.cell(95, 10, "Iskonto Orani (Pompa Fiyati)", 1, 0)
-    pdf.cell(95, 10, f"% {iskonto}", 1, 1, 'C')
-    
-    pdf.cell(95, 10, "Odeme Vadesi", 1, 0)
-    pdf.cell(95, 10, f"{vade} Gun", 1, 1, 'C')
-    
-    pdf.cell(95, 10, "Sistem Kullanimi", 1, 0)
-    pdf.cell(95, 10, "Ucretsiz", 1, 1, 'C')
-    
-    pdf.ln(20)
-    
-    # İmza
-    pdf.set_font("Arial", size=11)
-    pdf.cell(0, 7, "Saygilarimizla,", ln=True, align='R')
-    pdf.set_font("Arial", 'B', 11)
-    pdf.cell(0, 7, "Ozkaraaslan Filo Yonetimi", ln=True, align='R')
-    pdf.cell(0, 7, "Bolge Mudurlugu", ln=True, align='R')
-    
-    return pdf.output(dest='S').encode('latin-1', 'replace')
+# --- WORD TEKLİF OLUŞTURUCU ---
+def word_teklif_olustur(firma_adi, iskonto, vade, yetkili):
+    try:
+        doc = DocxTemplate(SABLON_DOSYASI)
+        context = {
+            'firma_adi': firma_adi,
+            'yetkili': yetkili,
+            'iskonto': iskonto,
+            'vade': vade,
+            'tarih': datetime.now().strftime("%d.%m.%Y")
+        }
+        doc.render(context)
+        
+        # Dosyayı hafızaya kaydet (Diske değil)
+        bio = io.BytesIO()
+        doc.save(bio)
+        return bio.getvalue()
+    except Exception as e:
+        return None
 
 # --- GOOGLE SHEETS ---
 def get_google_sheet_client():
@@ -195,14 +108,14 @@ def veri_tabanini_yukle():
         client = get_google_sheet_client()
         sheet = client.open(SHEET_ADI).sheet1
         data = sheet.get_all_records()
-        beklenen_sutunlar = ["Firma", "Yetkili_Kisi", "Telefon", "Web", "Email", "Adres", "Durum", "Notlar", 
+        beklenen = ["Firma", "Yetkili_Kisi", "Telefon", "Web", "Email", "Adres", "Durum", "Notlar", 
                              "Sozlesme_Tarihi", "Hatirlatici_Tarih", "Hatirlatici_Saat", 
                              "Tuketim_Bilgisi", "Ziyaret_Tarihi", "Arac_Sayisi", "Firma_Sektoru", "Konum_Linki", "Iskonto_Orani", "Dosya_Linki"]
         if not data:
-            sheet.append_row(beklenen_sutunlar)
-            return pd.DataFrame(columns=beklenen_sutunlar)
+            sheet.append_row(beklenen)
+            return pd.DataFrame(columns=beklenen)
         df = pd.DataFrame(data)
-        for col in beklenen_sutunlar:
+        for col in beklenen:
             if col not in df.columns: df[col] = ""
         text_cols = ["Notlar", "Telefon", "Yetkili_Kisi", "Tuketim_Bilgisi", "Firma", "Adres", "Durum", "Web", "Email", "Hatirlatici_Saat", "Arac_Sayisi", "Firma_Sektoru", "Konum_Linki", "Iskonto_Orani", "Dosya_Linki"]
         for col in text_cols:
@@ -218,7 +131,8 @@ def veriyi_kaydet(df):
         sheet = client.open(SHEET_ADI).sheet1
         df_save = df.copy()
         for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi", "Ziyaret_Tarihi"]:
-            if col in df_save.columns: df_save[col] = pd.to_datetime(df_save[col], errors='coerce').dt.strftime('%Y-%m-%d')
+            if col in df_save.columns:
+                df_save[col] = pd.to_datetime(df_save[col], errors='coerce').dt.strftime('%Y-%m-%d')
         df_save = df_save.fillna("")
         sheet.clear()
         sheet.update([df_save.columns.values.tolist()] + df_save.values.tolist())
@@ -274,7 +188,7 @@ def detay_getir(place_id):
 # --- ANA EKRAN ---
 col_logo, col_menu = st.columns([1, 6])
 with col_logo:
-    st.image(LOGO_URL, width=60)
+    st.image("https://upload.wikimedia.org/wikipedia/commons/2/2e/Petrol_Ofisi_logo.svg", width=60)
 with col_menu:
     selected = option_menu(
         menu_title=None,
@@ -377,7 +291,6 @@ elif selected == "Müşteriler":
     st.markdown("#### 👥 Müşteri Portföyü")
     df = veri_tabanini_yukle()
     
-    # FİLTRELEME
     if not df.empty:
         with st.expander("🌪️ Filtreleme & Arama", expanded=False):
             c1, c2 = st.columns(2)
@@ -403,10 +316,10 @@ elif selected == "Müşteriler":
                 c1, c2 = st.columns(2)
                 with c1:
                     yeni_yetkili = st.text_input("👤 Yetkili", value=secilen_veri.get('Yetkili_Kisi', ''))
-                    yeni_tel = st.text_input("Telefon", value=secilen_veri['Telefon'])
-                    yeni_email = st.text_input("Email", value=secilen_veri['Email'])
-                    yeni_sektor = st.text_input("Sektör", value=secilen_veri.get('Firma_Sektoru', ''))
-                    yeni_arac = st.text_input("Araç Sayısı", value=secilen_veri.get('Arac_Sayisi', ''))
+                    yeni_tel = st.text_input("📞 Telefon", value=secilen_veri['Telefon'])
+                    yeni_email = st.text_input("📧 Email", value=secilen_veri['Email'])
+                    yeni_arac = st.text_input("🚛 Araç Sayısı", value=secilen_veri.get('Arac_Sayisi', ''))
+                    yeni_sektor = st.text_input("🏭 Sektör", value=secilen_veri.get('Firma_Sektoru', ''))
                 with c2:
                     durum_listesi = ["Yeni", "📞 Arandı", "⏳ Teklif Verildi", "✅ Anlaşıldı", "❌ Olumsuz"]
                     try: m_idx = durum_listesi.index(secilen_veri['Durum'])
@@ -426,17 +339,17 @@ elif selected == "Müşteriler":
                     yeni_hatirlat_saat = col_time.time_input("Saat", value=time_obj)
 
                 yeni_adres = st.text_area("Adres", value=secilen_veri['Adres'], height=60)
-                yeni_konum = st.text_input("📍 Konum Linki", value=secilen_veri.get('Konum_Linki', ''))
+                yeni_konum = st.text_input("📍 Konum (Link)", value=secilen_veri.get('Konum_Linki', ''))
                 yeni_dosya = st.text_input("📄 Dosya Linki", value=secilen_veri.get('Dosya_Linki', ''))
                 yeni_not = st.text_area("Notlar", value=secilen_veri['Notlar'])
                 
                 col_b1, col_b2, col_b3, col_b4 = st.columns(4)
-                if arama_linki_yap(yeni_tel): col_b1.link_button("📞 Ara", arama_linki_yap(yeni_tel), use_container_width=True)
-                if whatsapp_linki_yap(yeni_tel): col_b2.link_button("💬 WP", whatsapp_linki_yap(yeni_tel), use_container_width=True)
+                if arama_linki_yap(yeni_tel): col_b1.link_button("📞", arama_linki_yap(yeni_tel), use_container_width=True)
+                if whatsapp_linki_yap(yeni_tel): col_b2.link_button("💬", whatsapp_linki_yap(yeni_tel), use_container_width=True)
                 nav_link = navigasyon_linki_yap(yeni_adres, yeni_konum)
                 if nav_link: col_b3.link_button("🗺️ Yol", nav_link, use_container_width=True)
                 cal_link = google_calendar_link(f"Görüşme: {secilen_veri['Firma']}", yeni_hatirlat_tar, yeni_hatirlat_saat.strftime('%H:%M'), yeni_adres, yeni_not)
-                if cal_link: col_b4.link_button("📅 Takvim", cal_link, use_container_width=True)
+                if cal_link: col_b4.link_button("📅", cal_link, use_container_width=True)
                 
                 if yeni_dosya and "http" in yeni_dosya:
                     st.link_button("📂 Dosyayı Aç", yeni_dosya, type="secondary", use_container_width=True)
@@ -520,7 +433,7 @@ elif selected == "Müşteriler":
 # --- YENİ TAB: TEKLİF & HESAP ---
 elif selected == "Teklif & Hesap":
     st.markdown("#### 🧮 Hesaplama & Teklif")
-    tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 PDF Teklif"])
+    tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word Teklif Oluştur"])
     
     with tab_hesap:
         c1, c2 = st.columns(2)
@@ -542,19 +455,24 @@ elif selected == "Teklif & Hesap":
             st.success(f"Müşteriye teklif edilecek fiyat: **{indirimli_fiyat:.2f} TL**")
 
     with tab_pdf:
-        st.info("👇 Teklif PDF'i oluşturup indirin.")
+        st.info("👇 Word Şablonu Doldur (teklif_sablonu.docx gereklidir)")
         with st.form("pdf_form"):
             p_firma = st.text_input("Firma Adı")
             p_yetkili = st.text_input("Yetkili")
             p_iskonto = st.number_input("İskonto (%)", value=3.0)
             p_vade = st.number_input("Vade (Gün)", value=30)
-            generate_btn = st.form_submit_button("📄 PDF Oluştur")
+            generate_btn = st.form_submit_button("📄 Teklif Oluştur")
         
-        # HATA DÜZELTME: Buton form dışında çalışmalı
         if generate_btn:
             if p_firma:
-                pdf_bytes = teklif_pdf_olustur(p_firma, p_iskonto, p_vade, p_yetkili)
-                st.download_button("📥 İNDİR", pdf_bytes, f"{p_firma}_Teklif.pdf", "application/pdf", type="primary")
+                try:
+                    word_bytes = word_teklif_olustur(p_firma, p_iskonto, p_vade, p_yetkili)
+                    if word_bytes:
+                        st.download_button("📥 WORD İNDİR", word_bytes, f"{p_firma}_Teklif.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", type="primary")
+                    else:
+                        st.error("Şablon dosyası (teklif_sablonu.docx) GitHub'da bulunamadı!")
+                except Exception as e:
+                    st.error(f"Hata: {e}")
             else: st.error("Firma adı giriniz.")
 
 # --- AJANDA ---
@@ -570,3 +488,16 @@ elif selected == "Ajanda":
                          column_config={"Hatirlatici_Tarih": st.column_config.DateColumn("Tarih", format="DD.MM.YYYY"), "Hatirlatici_Saat": "Saat", "Yetkili_Kisi": "Yetkili"}, 
                          hide_index=True, use_container_width=True)
         else: st.success("Randevu yok.")
+
+# --- BİLDİRİM ---
+elif selected == "Bildirim":
+    st.markdown("#### 🔔 Acil İşler")
+    df = veri_tabanini_yukle()
+    if not df.empty and "Hatirlatici_Tarih" in df.columns:
+        bugun = pd.Timestamp.now().normalize()
+        acil = df[(df["Hatirlatici_Tarih"] <= bugun) & (df["Durum"] != "✅ Anlaşıldı")]
+        if not acil.empty:
+            for i, r in acil.iterrows(): 
+                saat = f"⏰ {r.get('Hatirlatici_Saat', '')}" if r.get('Hatirlatici_Saat') else ""
+                st.error(f"⚠️ **{r['Firma']}**: {r['Notlar']} ({saat})")
+        else: st.info("Temiz.")
