@@ -73,7 +73,7 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
-# Türkçe karakter düzeltme fonksiyonu
+# Türkçe karakter düzeltme
 def sehir_duzelt(sehir):
     tr_map = {'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', 'İ': 'i', 'Ğ': 'g', 'Ü': 'u', 'Ş': 's', 'Ö': 'o', 'Ç': 'c'}
     sehir = sehir.lower()
@@ -92,46 +92,28 @@ SEHIRLER = [
     "Kirikkale", "Batman", "Sirnak", "Bartin", "Ardahan", "Igdir", "Yalova", "Karabuk", "Kilis", "Osmaniye", "Duzce"
 ]
 
-# --- YENİ FİYAT ÇEKME MOTORU (ALTERNATİF KAYNAK) ---
-@st.cache_data(ttl=3600) # 1 saat hafızada tut, sürekli siteye gitmesin
+# --- FİYAT ÇEKME MOTORU (Stabil) ---
+@st.cache_data(ttl=3600)
 def fiyat_cek_garanti(sehir):
-    """Haberler.com veya Doviz.com gibi daha stabil kaynaklardan PO fiyatını çeker"""
     try:
         sehir_slug = sehir_duzelt(sehir)
-        # Kaynak: Haberler.com (Daha az korumalı, daha stabil)
         url = f"https://www.haberler.com/akaryakit-fiyatlari/{sehir_slug}/"
-        
         headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers, timeout=5)
-        
         if response.status_code == 200:
-            # Pandas ile sayfadaki tüm tabloları oku
             dfs = pd.read_html(response.content)
-            
             for df in dfs:
-                # Tabloyu string'e çevirip içinde Petrol Ofisi var mı bak
                 if "Petrol Ofisi" in str(df) or "PETROL OFİSİ" in str(df):
-                    # İlgili satırı bul
                     for index, row in df.iterrows():
                         row_str = str(row).lower()
                         if "petrol ofisi" in row_str:
-                            # Genelde: Marka | Benzin | Motorin | LPG
-                            # Motorin sütununu bulmaya çalış (Genelde 2. veya 3. sayısal sütun)
-                            # Sütunlardaki değerleri al
                             values = [str(x).replace('TL', '').replace(',', '.').strip() for x in row if isinstance(x, (int, float, str))]
-                            
                             for val in values:
                                 try:
                                     fiyat = float(val)
-                                    # Mantık kontrolü: Motorin fiyatı 35-60 TL arasında olmalı
-                                    if 35 < fiyat < 60:
-                                        return fiyat
-                                except:
-                                    continue
-    except Exception as e:
-        pass
-    
-    # Eğer çekemezse varsayılan güvenli değer
+                                    if 35 < fiyat < 60: return fiyat
+                                except: continue
+    except: pass
     return 0.0
 
 # --- WORD TEKLİF ---
@@ -147,7 +129,8 @@ def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli,
         bio = io.BytesIO()
         doc.save(bio)
         return bio.getvalue()
-    except: return None
+    except Exception as e:
+        return None
 
 # --- GOOGLE SHEETS ---
 def get_google_sheet_client():
@@ -190,7 +173,7 @@ def veriyi_kaydet(df):
         df_save = df.copy()
         for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi", "Ziyaret_Tarihi"]:
             if col in df_save.columns: df_save[col] = pd.to_datetime(df_save[col], errors='coerce').dt.strftime('%Y-%m-%d')
-        df_save = df_save.fillna("")
+        df_save = df_save.astype(str).replace("nan", "").replace("NaT", "").replace("None", "")
         sheet.clear()
         sheet.update([df_save.columns.values.tolist()] + df_save.values.tolist())
         st.cache_data.clear()
@@ -384,3 +367,230 @@ elif selected == "Müşteriler":
                     yeni_durum = st.selectbox("Durum", durum_listesi, index=m_idx)
                     yeni_tuketim = st.text_input("Tüketim (m3/Ton)", value=secilen_veri.get('Tuketim_Bilgisi', ''))
                     yeni_iskonto = st.text_input("💸 İskonto (%)", value=secilen_veri.get('Iskonto_Orani', ''))
+                    
+                    st.write("🗓️ **Randevu & Bildirim**")
+                    col_date, col_time = st.columns(2)
+                    val_hatirlat_tar = secilen_veri.get('Hatirlatici_Tarih')
+                    if pd.isna(val_hatirlat_tar): val_hatirlat_tar = None
+                    yeni_hatirlat_tar = col_date.date_input("Tarih", value=val_hatirlat_tar)
+                    
+                    val_hatirlat_saat = secilen_veri.get('Hatirlatici_Saat', '09:00')
+                    try: time_obj = datetime.strptime(str(val_hatirlat_saat), '%H:%M').time()
+                    except: time_obj = datetime.strptime('09:00', '%H:%M').time()
+                    yeni_hatirlat_saat = col_time.time_input("Saat", value=time_obj)
+
+                yeni_adres = st.text_area("Adres", value=secilen_veri['Adres'], height=60)
+                yeni_konum = st.text_input("📍 Konum Linki", value=secilen_veri.get('Konum_Linki', ''))
+                yeni_dosya = st.text_input("📄 Dosya Linki", value=secilen_veri.get('Dosya_Linki', ''))
+                yeni_not = st.text_area("Görüşme Notları", value=secilen_veri['Notlar'])
+                
+                col_b1, col_b2, col_b3, col_b4 = st.columns(4)
+                if arama_linki_yap(yeni_tel): col_b1.link_button("📞 Ara", arama_linki_yap(yeni_tel), use_container_width=True)
+                if whatsapp_linki_yap(yeni_tel): col_b2.link_button("💬 WP", whatsapp_linki_yap(yeni_tel), use_container_width=True)
+                nav_link = navigasyon_linki_yap(yeni_adres, yeni_konum)
+                if nav_link: col_b3.link_button("🗺️ Yol", nav_link, use_container_width=True)
+                cal_link = google_calendar_link(f"Görüşme: {secilen_veri['Firma']}", yeni_hatirlat_tar, yeni_hatirlat_saat.strftime('%H:%M'), yeni_adres, yeni_not)
+                if cal_link: col_b4.link_button("📅 Takvim", cal_link, use_container_width=True)
+                
+                if yeni_dosya and "http" in yeni_dosya:
+                    st.link_button("📂 Dosyayı Aç", yeni_dosya, type="secondary", use_container_width=True)
+                
+                # DÜZELTME: submit button formun içinde olmalı
+                kaydet_btn = st.form_submit_button("💾 Kaydet", type="primary", use_container_width=True)
+            
+            if kaydet_btn:
+                df.at[idx, 'Yetkili_Kisi'] = yeni_yetkili
+                df.at[idx, 'Telefon'] = yeni_tel
+                df.at[idx, 'Email'] = yeni_email
+                df.at[idx, 'Adres'] = yeni_adres
+                df.at[idx, 'Durum'] = yeni_durum
+                df.at[idx, 'Tuketim_Bilgisi'] = yeni_tuketim
+                df.at[idx, 'Arac_Sayisi'] = yeni_arac
+                df.at[idx, 'Firma_Sektoru'] = yeni_sektor
+                df.at[idx, 'Konum_Linki'] = yeni_konum
+                df.at[idx, 'Iskonto_Orani'] = yeni_iskonto
+                df.at[idx, 'Dosya_Linki'] = yeni_dosya
+                df.at[idx, 'Hatirlatici_Tarih'] = pd.to_datetime(yeni_hatirlat_tar)
+                df.at[idx, 'Hatirlatici_Saat'] = yeni_hatirlat_saat.strftime('%H:%M')
+                df.at[idx, 'Notlar'] = yeni_not
+                veriyi_kaydet(df)
+                st.success("✅ Güncellendi!")
+                time.sleep(1)
+                st.rerun()
+
+            if st.button("🗑️ Sil", type="secondary", use_container_width=True):
+                df = df.drop(idx)
+                veriyi_kaydet(df)
+                st.rerun()
+        else: st.info("Listeniz boş.")
+
+    elif mode == "➕ Yeni Ekle":
+        st.markdown("""<div class="customer-card"><h4>✨ Yeni Müşteri</h4></div>""", unsafe_allow_html=True)
+        with st.form("yeni_ekle"):
+            firma_adi = st.text_input("🏢 Firma Adı (Zorunlu)")
+            c1, c2 = st.columns(2)
+            with c1:
+                yetkili = st.text_input("👤 Yetkili")
+                tel = st.text_input("📞 Telefon")
+                email = st.text_input("📧 Email")
+                sektor = st.text_input("🏭 Sektör")
+            with c2:
+                adres = st.text_area("Adres", height=100)
+                tuketim = st.text_input("Tüketim")
+                arac = st.text_input("🚛 Araç")
+                iskonto = st.text_input("💸 İskonto (%)")
+            
+            konum_link = st.text_input("📍 Konum (Link)")
+            dosya_link = st.text_input("📄 Dosya Linki")
+            
+            st.write("📅 **Randevu**")
+            col_d, col_t = st.columns(2)
+            yeni_tar = col_d.date_input("Tarih", value=None)
+            yeni_saat = col_t.time_input("Saat", value=None)
+            notlar = st.text_area("Notlar")
+            
+            kaydet_yeni = st.form_submit_button("💾 Kaydet", type="primary", use_container_width=True)
+        
+        if kaydet_yeni:
+            if firma_adi:
+                hatirlat_str = yeni_tar.strftime('%Y-%m-%d') if yeni_tar else ""
+                saat_str = yeni_saat.strftime('%H:%M') if yeni_saat else ""
+                yeni_veri = {
+                    "Firma": firma_adi, "Yetkili_Kisi": yetkili, "Telefon": tel, "Web": "", "Email": email,
+                    "Adres": adres, "Durum": "Yeni", "Notlar": notlar,
+                    "Tuketim_Bilgisi": tuketim, "Arac_Sayisi": arac, "Firma_Sektoru": sektor, 
+                    "Konum_Linki": konum_link, "Iskonto_Orani": iskonto, "Dosya_Linki": dosya_link,
+                    "Sozlesme_Tarihi": "", "Hatirlatici_Tarih": hatirlat_str, "Hatirlatici_Saat": saat_str, "Ziyaret_Tarihi": ""
+                }
+                df = pd.concat([df, pd.DataFrame([yeni_veri])], ignore_index=True)
+                veriyi_kaydet(df)
+                st.success(f"{firma_adi} Eklendi!")
+                if yeni_tar:
+                    cal_link = google_calendar_link(f"PO Görüşme: {firma_adi}", yeni_tar, saat_str, adres, notlar)
+                    if cal_link: st.link_button("📅 TAKVİME EKLE", cal_link, type="secondary", use_container_width=True)
+                time.sleep(3)
+                st.rerun()
+            else: st.error("Firma Adı zorunlu.")
+
+# --- YENİ TAB: TEKLİF & HESAP ---
+elif selected == "Teklif & Hesap":
+    st.markdown("#### 🧮 Hesaplama & Teklif")
+    tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word Teklif Oluştur"])
+    
+    with tab_hesap:
+        col_sehir, col_bos = st.columns([2, 1])
+        secilen_sehir = col_sehir.selectbox("🌍 Şehir Seç", SEHIRLER, index=SEHIRLER.index("Gaziantep"))
+        
+        # Fiyatı çek
+        with st.spinner("Güncel fiyat çekiliyor..."):
+            oto_fiyat = fiyat_cek_garanti(secilen_sehir)
+            
+        if oto_fiyat == 0.0:
+            st.warning("⚠️ Fiyat çekilemedi, manuel giriniz.")
+            oto_fiyat = 44.00
+        else:
+            st.success(f"✅ {secilen_sehir} V/Max: {oto_fiyat} TL")
+            
+        c1, c2 = st.columns(2)
+        with c1:
+            aylik_litre = st.number_input("Aylık Tüketim (Litre)", min_value=0, value=1000)
+            guncel_fiyat = st.number_input("Pompa Fiyatı (TL)", value=oto_fiyat)
+        with c2:
+            iskonto_orani = st.number_input("Pompa İskonto (%)", min_value=0.0, max_value=15.0, value=3.0)
+            iskonto_anlasmali = st.number_input("Anlaşmalı İstasyon İskonto (%)", min_value=0.0, max_value=15.0, value=0.0)
+        
+        st.markdown("---")
+        if aylik_litre > 0:
+            indirimli_pompa = guncel_fiyat * (1 - (iskonto_orani/100))
+            aylik_kazanc_pompa = (guncel_fiyat - indirimli_pompa) * aylik_litre
+            yillik_kazanc_pompa = aylik_kazanc_pompa * 12
+            
+            indirimli_ist = guncel_fiyat * (1 - (iskonto_anlasmali/100))
+            aylik_kazanc_ist = (guncel_fiyat - indirimli_ist) * aylik_litre
+            yillik_kazanc_ist = aylik_kazanc_ist * 12
+            
+            col_res1, col_res2 = st.columns(2)
+            
+            with col_res1:
+                st.markdown(f"""
+                <div class='compare-box' style='background:#e0f2fe; border:1px solid #7dd3fc;'>
+                    <h4>⛽ Pompa (%{iskonto_orani})</h4>
+                    <div class='price-tag' style='color:#0369a1;'>{indirimli_pompa:,.2f} TL</div>
+                    <small>İndirimli Litre Fiyatı</small>
+                    <hr style='margin:10px 0; opacity:0.3;'>
+                    <p>Aylık Kazanç: <b>{aylik_kazanc_pompa:,.2f} TL</b></p>
+                    <p>Yıllık Kazanç: <b>{yillik_kazanc_pompa:,.2f} TL</b></p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            with col_res2:
+                st.markdown(f"""
+                <div class='compare-box' style='background:#dcfce7; border:1px solid #86efac;'>
+                    <h4>🏪 Anlaşmalı İst. (%{iskonto_anlasmali})</h4>
+                    <div class='price-tag' style='color:#15803d;'>{indirimli_ist:,.2f} TL</div>
+                    <small>İndirimli Litre Fiyatı</small>
+                    <hr style='margin:10px 0; opacity:0.3;'>
+                    <p>Aylık Kazanç: <b>{aylik_kazanc_ist:,.2f} TL</b></p>
+                    <p>Yıllık Kazanç: <b>{yillik_kazanc_ist:,.2f} TL</b></p>
+                </div>
+                """, unsafe_allow_html=True)
+
+    with tab_pdf:
+        st.info("👇 Word Şablonu Doldur")
+        try:
+            with st.form("pdf_form"):
+                p_firma = st.text_input("Firma Adı")
+                p_yetkili = st.text_input("Yetkili")
+                
+                col_pdf1, col_pdf2 = st.columns(2)
+                p_iskonto_pompa = col_pdf1.number_input("Pompa İskonto (%)", value=3.0)
+                p_iskonto_istasyon = col_pdf2.number_input("Anlaşmalı İst. İskonto (%)", value=0.0)
+                
+                odeme_secenekleri = [
+                    "Fatura Kesiminden 5 Gün Sonra", 
+                    "Fatura Kesiminden 10 Gün Sonra", 
+                    "Fatura Kesiminden 15 Gün Sonra",
+                    "Ayın 5'i", "Ayın 10'u", "Ayın 15'i", "Ayın 20'si", "Ayın 25'i",
+                    "Ön Ödeme (Havale/EFT)", "Kredi Kartı ile Ödeme", "DBS (Doğrudan Borçlandırma)"
+                ]
+                p_odeme = st.selectbox("Ödeme/Vade Şekli", odeme_secenekleri)
+                
+                generate_btn = st.form_submit_button("📄 Teklif Oluştur")
+            
+            if generate_btn:
+                if p_firma:
+                    word_bytes = word_teklif_olustur(p_firma, p_iskonto_pompa, p_iskonto_istasyon, p_odeme, p_yetkili)
+                    if word_bytes:
+                        st.download_button("📥 WORD İNDİR", word_bytes, f"{p_firma}_Teklif.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", type="primary")
+                    else:
+                        st.error("Şablon dosyası (teklif_sablonu.docx) GitHub'da bulunamadı!")
+                else: st.error("Firma adı giriniz.")
+        except Exception as e:
+            st.error(f"PDF Modülü Hatası: {e}")
+
+# --- AJANDA ---
+elif selected == "Ajanda":
+    st.markdown("#### 📅 Randevular")
+    df = veri_tabanini_yukle()
+    if not df.empty and "Hatirlatici_Tarih" in df.columns:
+        bugun = pd.Timestamp.now().normalize()
+        gelecek = df[(df["Hatirlatici_Tarih"] >= bugun) & (df["Durum"] != "✅ Anlaşıldı")].copy()
+        if not gelecek.empty:
+            gelecek = gelecek.sort_values(by=["Hatirlatici_Tarih", "Hatirlatici_Saat"])
+            st.dataframe(gelecek[["Hatirlatici_Tarih", "Hatirlatici_Saat", "Firma", "Yetkili_Kisi", "Notlar"]], 
+                         column_config={"Hatirlatici_Tarih": st.column_config.DateColumn("Tarih", format="DD.MM.YYYY"), "Hatirlatici_Saat": "Saat", "Yetkili_Kisi": "Yetkili"}, 
+                         hide_index=True, use_container_width=True)
+        else: st.success("Randevu yok.")
+
+# --- BİLDİRİM ---
+elif selected == "Bildirim":
+    st.markdown("#### 🔔 Acil İşler")
+    df = veri_tabanini_yukle()
+    if not df.empty and "Hatirlatici_Tarih" in df.columns:
+        bugun = pd.Timestamp.now().normalize()
+        acil = df[(df["Hatirlatici_Tarih"] <= bugun) & (df["Durum"] != "✅ Anlaşıldı")]
+        if not acil.empty:
+            for i, r in acil.iterrows(): 
+                saat = f"⏰ {r.get('Hatirlatici_Saat', '')}" if r.get('Hatirlatici_Saat') else ""
+                st.error(f"⚠️ **{r['Firma']}**: {r['Notlar']} ({saat})")
+        else: st.info("Temiz.")
