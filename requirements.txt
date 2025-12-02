@@ -6,7 +6,6 @@ gspread
 oauth2client
 beautifulsoup4
 streamlit-option-menu
-fpdf
 docxtpl
-lxml
+fpdf
 
