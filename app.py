@@ -32,10 +32,8 @@ def local_css():
         .kpi-val { font-size: 1.4rem; font-weight: 700; color: #1f2937; }
         .stButton>button { border-radius: 8px; height: 45px; font-weight: 600; width: 100%; }
         .nav-link-selected { background-color: #e30613 !important; }
-        
         .compare-box { padding: 20px; border-radius: 12px; text-align: center; color: #333; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .price-tag { font-size: 1.8rem; font-weight: 800; margin: 10px 0; }
-        
         #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -64,7 +62,7 @@ if not st.session_state['giris_yapildi']:
 
 # --- SABİTLER ---
 SHEET_ADI = "Lojistik_Verileri"
-API_KEY = "BURAYA_API_KEYINI_YAPISTIR" 
+API_KEY = "AIzaSyCw0bhZ2WTrZtThjgJBMsbjZ7IDh6QN0Og"
 SABLON_DOSYASI = "teklif_sablonu.docx" 
 LOGO_URL = "https://www.ozkaraaslanfilo.com/wp-content/uploads/2021/01/logo.png"
 
@@ -74,48 +72,6 @@ SEKTORLER = {
     "🚌 Servis/Turizm": "Personel Taşımacılığı", "🏗️ İnşaat": "İnşaat Malzemeleri Toptancıları",
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
-
-# ŞEHİRLER (PO URL Yapısına Uygun)
-SEHIRLER = [
-    "Adana", "Adiyaman", "Afyonkarahisar", "Agri", "Amasya", "Ankara", "Antalya", "Artvin", "Aydin", "Balikesir", "Bilecik", "Bingol", "Bitlis", "Bolu", "Burdur", "Bursa", "Canakkale", "Cankiri", "Corum", "Denizli", "Diyarbakir", "Edirne", "Elazig", "Erzincan", "Erzurum", "Eskisehir", "Gaziantep", "Giresun", "Gumushane", "Hakkari", "Hatay", "Isparta", "Mersin", "Istanbul", "Izmir", "Kars", "Kastamonu", "Kayseri", "Kirklareli", "Kirsehir", "Kocaeli", "Konya", "Kutahya", "Malatya", "Manisa", "Kahramanmaras", "Mardin", "Mugla", "Mus", "Nevsehir", "Nigde", "Ordu", "Rize", "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Tekirdag", "Tokat", "Trabzon", "Tunceli", "Sanliurfa", "Usak", "Van", "Yozgat", "Zonguldak", "Aksaray", "Bayburt", "Karaman", "Kirikkale", "Batman", "Sirnak", "Bartin", "Ardahan", "Igdir", "Yalova", "Karabuk", "Kilis", "Osmaniye", "Duzce"
-]
-
-# --- CANLI FİYAT ÇEKME MOTORU ---
-def fiyat_cek_po(sehir_slug):
-    """Petrol Ofisi sitesinden V/Max Diesel fiyatını çeker"""
-    try:
-        # Şehir adını küçük harfe çevir
-        sehir_kucuk = sehir_slug.lower()
-        url = f"https://www.petrolofisi.com.tr/akaryakit-fiyatlari/{sehir_kucuk}"
-        
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        response = requests.get(url, headers=headers, timeout=5)
-        
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            # Tabloyu bul
-            table = soup.find('table')
-            if table:
-                rows = table.find_all('tr')
-                # Genelde ilk satır (Merkez) veya 2. satırdan veri alırız.
-                # Sütun sırası değişebilir ama genelde: İlçe | Kurşunsuz | V/Max Diesel | ...
-                # Biz tablodaki ilk sayısal değeri veya "Motorin" sütununu arayacağız.
-                
-                # Basit bir yaklaşımla tablodaki tüm fiyatları alıp mantıklı olanı (Dizel) seçelim.
-                # PO sitesinde V/Max Diesel genelde 2. veya 3. fiyat sütunudur.
-                
-                for row in rows[1:]: # Başlığı geç
-                    cols = row.find_all('td')
-                    if len(cols) > 2:
-                        # V/Max Diesel Fiyatını Al (Genelde 3. sütun, index 2)
-                        fiyat_text = cols[2].text.strip()
-                        # Fiyatı temizle (TL yazısını at, virgülü nokta yap)
-                        fiyat_temiz = fiyat_text.replace('TL', '').replace(',', '.').strip()
-                        return float(fiyat_temiz)
-    except Exception as e:
-        print(f"Fiyat çekme hatası: {e}")
-        return 0.0
-    return 0.0
 
 # --- WORD TEKLİF ---
 def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
@@ -173,7 +129,7 @@ def veriyi_kaydet(df):
         df_save = df.copy()
         for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi", "Ziyaret_Tarihi"]:
             if col in df_save.columns: df_save[col] = pd.to_datetime(df_save[col], errors='coerce').dt.strftime('%Y-%m-%d')
-        df_save = df_save.fillna("")
+        df_save = df_save.astype(str).replace("nan", "").replace("NaT", "").replace("None", "")
         sheet.clear()
         sheet.update([df_save.columns.values.tolist()] + df_save.values.tolist())
         st.cache_data.clear()
@@ -250,7 +206,6 @@ st.write("")
 if selected == "Pano":
     tarih_str = datetime.now().strftime("%d %B %Y")
     st.markdown(f"""<div class="hero-card"><h3>👋 Merhaba, Müdürüm</h3><p>{tarih_str} | Saha Operasyon Paneli</p></div>""", unsafe_allow_html=True)
-    st.link_button("⛽ GÜNCEL AKARYAKIT FİYATLARI (LİSTE)", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
     
     df = veri_tabanini_yukle()
     if not df.empty:
@@ -473,24 +428,27 @@ elif selected == "Müşteriler":
 # --- YENİ TAB: TEKLİF & HESAP ---
 elif selected == "Teklif & Hesap":
     st.markdown("#### 🧮 Hesaplama & Teklif")
+    
+    # --- FİYAT BUTONU VE MANUEL GİRİŞ ---
+    col_btn, col_val = st.columns([2, 1])
+    col_btn.info("👇 Güncel fiyatlar için resmi listeyi açın:")
+    col_btn.link_button("⛽ Petrol Ofisi Fiyat Listesi (Yeni Sekme)", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
+    
+    # Kullanıcı fiyatı buradan girecek (Hafızada tutulur)
+    if 'manuel_fiyat' not in st.session_state: st.session_state['manuel_fiyat'] = 44.50
+    guncel_fiyat_giris = col_val.number_input("Güncel Pompa Fiyatı (TL)", value=st.session_state['manuel_fiyat'], step=0.10)
+    st.session_state['manuel_fiyat'] = guncel_fiyat_giris # Değeri güncelle
+    
+    st.markdown("---")
+    
     tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word Teklif Oluştur"])
     
     with tab_hesap:
-        # ŞEHİR VE OTOMATİK FİYAT
-        col_sehir, col_fiyat = st.columns([2, 1])
-        secilen_sehir = col_sehir.selectbox("🌍 Şehir Seç", SEHIRLER, index=SEHIRLER.index("Gaziantep"))
-        
-        # Fiyatı çek, yoksa varsayılan
-        oto_fiyat = fiyat_cek_po(secilen_sehir)
-        if oto_fiyat == 0.0: oto_fiyat = 44.0
-        
-        with col_fiyat:
-            st.info(f"📍 {secilen_sehir}: **{oto_fiyat} TL**")
-        
         c1, c2 = st.columns(2)
         with c1:
             aylik_litre = st.number_input("Aylık Tüketim (Litre)", min_value=0, value=1000)
-            guncel_fiyat = st.number_input("Pompa Fiyatı (TL)", value=oto_fiyat)
+            # Fiyat yukarıdaki kutudan otomatik gelir
+            guncel_fiyat = st.number_input("Baz Alınan Fiyat", value=st.session_state['manuel_fiyat'], disabled=True)
         with c2:
             iskonto_orani = st.number_input("Pompa İskonto (%)", min_value=0.0, max_value=15.0, value=3.0)
             iskonto_anlasmali = st.number_input("Anlaşmalı İstasyon İskonto (%)", min_value=0.0, max_value=15.0, value=0.0)
