@@ -716,3 +716,4 @@ elif selected == "Bildirim":
                 saat = f"⏰ {r.get('Hatirlatici_Saat', '')}" if r.get('Hatirlatici_Saat') else ""
                 st.error(f"⚠️ **{r['Firma']}**: {r['Notlar']} ({saat})")
         else: st.info("Temiz.")
+
