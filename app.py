@@ -14,183 +14,54 @@ from docxtpl import DocxTemplate
 from fpdf import FPDF
 import io
 
-# --- 1. SAYFA AYARLARI ---
+# --- 1. SAYFA VE TASARIM AYARLARI ---
 st.set_page_config(
     page_title="Özkaraaslan Saha",
     page_icon="⛽", 
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded" # DÜZELTME: Menü artık açık başlayacak
 )
 
-# --- GÜVENLİK KONTROLÜ ---
+# --- 2. CSS TASARIMI ---
+def local_css():
+    st.markdown("""
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+        html, body, [class*="css"] { font-family: 'Roboto', sans-serif; background-color: #f4f6f9; }
+        .hero-card { background: linear-gradient(135deg, #e30613 0%, #8a040b 100%); padding: 20px; border-radius: 15px; color: white; box-shadow: 0 8px 15px rgba(227, 6, 19, 0.2); margin-bottom: 20px; }
+        .kpi-container { background-color: white; padding: 10px; border-radius: 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-bottom: 3px solid #e30613; }
+        .kpi-val { font-size: 1.4rem; font-weight: 700; color: #1f2937; }
+        .stButton>button { border-radius: 8px; height: 45px; font-weight: 600; width: 100%; }
+        .nav-link-selected { background-color: #e30613 !important; }
+        .compare-box { padding: 20px; border-radius: 12px; text-align: center; color: #333; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .price-tag { font-size: 1.8rem; font-weight: 800; margin: 10px 0; }
+        
+        /* Header görünür olsun ki mobilde menüyü açıp kapatabilesin */
+        #MainMenu {visibility: hidden;} footer {visibility: hidden;} 
+    </style>
+    """, unsafe_allow_html=True)
+local_css()
+
+# --- GÜVENLİK ---
 if 'giris_yapildi' not in st.session_state: st.session_state['giris_yapildi'] = False
 KULLANICI_ADI = "admin"
 SIFRE = "1234"
 
-# --- 2. TASARIM FONKSİYONLARI ---
-
-def login_css():
-    """Sadece Giriş Ekranı İçin Özel Karanlık Tasarım"""
-    st.markdown("""
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        /* Tüm Arka Planı Siyah/Lacivert Yap */
-        .stApp {
-            background-color: #0f172a; /* Koyu Lacivert/Siyah */
-            font-family: 'Inter', sans-serif;
-        }
-        
-        /* Giriş Kutusu (Kartı) */
-        .login-card {
-            background-color: white;
-            border-radius: 24px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            overflow: hidden;
-            max-width: 400px;
-            margin: 100px auto 0 auto;
-        }
-        
-        /* Kartın Kırmızı Başlığı */
-        .login-header {
-            background: #ef4444; /* Parlak Kırmızı */
-            padding: 40px 20px;
-            text-align: center;
-            color: white;
-        }
-        
-        /* İkon */
-        .login-icon {
-            font-size: 40px;
-            margin-bottom: 10px;
-        }
-        
-        /* Başlık Yazıları */
-        .login-title {
-            font-size: 24px;
-            font-weight: 700;
-            margin: 0;
-            letter-spacing: -0.5px;
-        }
-        .login-subtitle {
-            font-size: 14px;
-            font-weight: 400;
-            opacity: 0.9;
-            margin-top: 5px;
-        }
-        
-        /* Form Alanı */
-        .login-body {
-            padding: 30px;
-        }
-        
-        /* Input Kutuları */
-        .stTextInput > div > div > input {
-            background-color: #f3f4f6;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 10px 15px;
-            color: #111827;
-        }
-        
-        /* Giriş Butonu */
-        .stButton > button {
-            background-color: #ef4444 !important;
-            color: white !important;
-            border-radius: 12px;
-            height: 50px;
-            font-weight: 600;
-            border: none;
-            width: 100%;
-            margin-top: 10px;
-        }
-        .stButton > button:hover {
-            background-color: #dc2626 !important;
-        }
-        
-        /* Gereksizleri Gizle */
-        #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-    </style>
-    """, unsafe_allow_html=True)
-
-def dashboard_css():
-    """Uygulama İçi Aydınlık Tasarım"""
-    st.markdown("""
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        html, body, [class*="css"] {
-            font-family: 'Inter', sans-serif;
-            background-color: #f8fafc; /* Açık Gri-Mavi */
-        }
-        
-        /* Sidebar (Yan Menü) */
-        section[data-testid="stSidebar"] {
-            background-color: white;
-            border-right: 1px solid #e2e8f0;
-        }
-        
-        /* Kartlar */
-        .kpi-box { background: white; padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-bottom: 3px solid #e30613; }
-        .kpi-val { font-size: 1.4rem; font-weight: 700; color: #1e293b; }
-        .customer-card { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-left: 5px solid #e30613; margin-bottom: 15px; }
-        .hero-card { background: linear-gradient(135deg, #e30613 0%, #b91c1c 100%); padding: 25px; border-radius: 16px; color: white; box-shadow: 0 10px 15px -3px rgba(227, 6, 19, 0.3); margin-bottom: 20px; }
-        
-        /* Menü Linkleri */
-        .nav-link { font-size: 14px; text-align: left; margin: 5px; border-radius: 8px; color: #475569; }
-        .nav-link:hover { background-color: #f1f5f9; color: #0f172a; }
-        .nav-link-selected { background-color: #fef2f2 !important; color: #e30613 !important; font-weight: 600; }
-        
-        /* Butonlar */
-        .stButton>button { border-radius: 10px; height: 45px; font-weight: 600; width: 100%; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
-        
-        #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- GİRİŞ EKRANI FONKSİYONU ---
-def giris_ekrani_goster():
-    login_css() # Karanlık tema yükle
-    
-    # Ortalamak için kolonlar
-    c1, c2, c3 = st.columns([1, 1.5, 1])
-    
+def giris_ekrani():
+    st.markdown("<br><br><h2 style='text-align:center; color:#e30613;'>🔐 Özkaraaslan Giriş</h2>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([1,2,1])
     with c2:
-        # Kırmızı Başlık Kısmı (HTML ile)
-        st.markdown("""
-        <div class="login-card">
-            <div class="login-header">
-                <div class="login-icon">🏢</div> 
-                <h1 class="login-title">Özkaraaslan</h1>
-                <div class="login-subtitle">Saha Operasyon Sistemi</div>
-            </div>
-            <div class="login-body">
-        """, unsafe_allow_html=True)
-        
-        # Streamlit Formu (HTML div'in içine görsel olarak denk gelecek)
-        k = st.text_input("Kullanıcı Adı", placeholder="admin")
-        s = st.text_input("Şifre", type="password", placeholder="••••")
-        
-        if st.button("Giriş Yap"):
+        k = st.text_input("Kullanıcı")
+        s = st.text_input("Şifre", type="password")
+        if st.button("Giriş", type="primary"):
             if k == KULLANICI_ADI and s == SIFRE:
                 st.session_state['giris_yapildi'] = True
                 st.rerun()
-            else:
-                st.error("Hatalı Giriş!")
-        
-        st.markdown("""
-            <p style="text-align:center; font-size:12px; color:#9ca3af; margin-top:20px;">Demo: admin / 1234</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+            else: st.error("Hatalı!")
 
-# Eğer giriş yapılmadıysa burası çalışır ve durur
 if not st.session_state['giris_yapildi']:
-    giris_ekrani_goster()
+    giris_ekrani()
     st.stop()
-
-# --- BURADAN AŞAĞISI UYGULAMA İÇİ (AYDINLIK TEMA) ---
-dashboard_css() # Aydınlık tema yükle
 
 # --- SABİTLER ---
 SHEET_ADI = "Lojistik_Verileri"
@@ -205,30 +76,31 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
-# --- FİYAT ÇEKME MOTORU ---
-def turkce_karakter_duzelt(text):
-    text = text.lower()
-    replacements = {'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', 'İ': 'i', 'Ğ': 'g', 'Ü': 'u', 'Ş': 's', 'Ö': 'o', 'Ç': 'c'}
-    for src, target in replacements.items(): text = text.replace(src, target)
-    return text
+# --- WORD TEKLİF ---
+def tr_upper(text):
+    if not text: return ""
+    return str(text).replace('i', 'İ').replace('ı', 'I').upper()
+
+def tr_title(text):
+    if not text: return ""
+    words = str(text).split()
+    return " ".join([w[0].replace('i','İ').replace('ı','I').upper() + w[1:].replace('I','ı').replace('İ','i').lower() for w in words if w])
 
 def tr_pdf(text):
     replacements = {'ğ':'g','Ğ':'G','ü':'u','Ü':'U','ş':'s','Ş':'S','ı':'i','İ':'I','ö':'o','Ö':'O','ç':'c','Ç':'C'}
     for k,v in replacements.items(): text = text.replace(k, v)
     return text
 
-def tr_upper(text): return str(text).replace('i', 'İ').replace('ı', 'I').upper() if text else ""
-def tr_title(text):
-    if not text: return ""
-    return " ".join([w[0].replace('i','İ').replace('ı','I').upper() + w[1:].replace('I','ı').replace('İ','i').lower() for w in str(text).split() if w])
-
 def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         doc = DocxTemplate(SABLON_DOSYASI)
         context = {
-            'firma_adi': tr_upper(firma_adi), 'yetkili': tr_title(yetkili),
-            'iskonto_pompa': f"% {iskonto_pompa}", 'iskonto_istasyon': f"% {iskonto_istasyon}",
-            'odeme_sekli': str(odeme_sekli), 'tarih': datetime.now().strftime("%d.%m.%Y")
+            'firma_adi': tr_upper(firma_adi), 
+            'yetkili': tr_title(yetkili),
+            'iskonto_pompa': f"% {iskonto_pompa}",       
+            'iskonto_istasyon': f"% {iskonto_istasyon}", 
+            'odeme_sekli': str(odeme_sekli), 
+            'tarih': datetime.now().strftime("%d.%m.%Y")
         }
         doc.render(context)
         bio = io.BytesIO()
@@ -236,6 +108,7 @@ def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli,
         return bio.getvalue()
     except: return None
 
+# --- PDF TEKLİF ---
 def pdf_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         pdf = FPDF()
@@ -359,10 +232,10 @@ def detay_getir(place_id):
         return r.get('formatted_phone_number', ''), r.get('website', ''), r.get('url', '')
     except: return "", "", ""
 
-# --- YAN MENÜ (SIDEBAR) ---
+# --- SIDEBAR (SOL MENÜ) ---
 with st.sidebar:
     st.image(LOGO_URL, width=160)
-    st.markdown('<div style="text-align: left; font-weight: bold; color:#1f2937; margin-bottom: 10px;">Saha Operasyon</div>', unsafe_allow_html=True)
+    st.markdown("### Saha Yönetim")
     
     selected = option_menu(
         menu_title=None,
@@ -371,9 +244,9 @@ with st.sidebar:
         default_index=0,
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
-            "icon": {"color": "#64748b", "font-size": "16px"}, 
-            "nav-link": {"font-size": "15px", "text-align": "left", "margin":"5px", "--hover-color": "#f1f5f9", "color": "#1f2937"},
-            "nav-link-selected": {"background-color": "#fef2f2", "color": "#e30613"},
+            "icon": {"color": "#e30613", "font-size": "16px"}, 
+            "nav-link": {"font-size": "15px", "text-align": "left", "margin":"5px", "--hover-color": "#eee"},
+            "nav-link-selected": {"background-color": "#e30613", "color": "white"},
         }
     )
     st.markdown("---")
@@ -387,14 +260,13 @@ with st.sidebar:
 if selected == "Pano":
     tarih_str = datetime.now().strftime("%d %B %Y")
     st.markdown(f"""<div class="hero-card"><h3>👋 Merhaba, Müdürüm</h3><p>{tarih_str} | Saha Operasyon Paneli</p></div>""", unsafe_allow_html=True)
-    st.link_button("⛽ GÜNCEL AKARYAKIT FİYATLARI (LİSTE)", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
     
     df = veri_tabanini_yukle()
     if not df.empty:
         c1, c2, c3 = st.columns(3)
-        c1.markdown(f"""<div class="kpi-box"><div class="kpi-val">{len(df)}</div><div class="kpi-label">Müşteri</div></div>""", unsafe_allow_html=True)
-        c2.markdown(f"""<div class="kpi-box" style="border-left-color:#f59e0b;"><div class="kpi-val" style="color:#f59e0b">{len(df[df["Durum"] == "Yeni"])}</div><div class="kpi-label">Bekleyen</div></div>""", unsafe_allow_html=True)
-        c3.markdown(f"""<div class="kpi-box" style="border-left-color:#10b981;"><div class="kpi-val" style="color:#10b981">{len(df[df["Durum"] == "✅ Anlaşıldı"])}</div><div class="kpi-label">Başarılı</div></div>""", unsafe_allow_html=True)
+        c1.markdown(f"""<div class="kpi-container"><div class="kpi-val">{len(df)}</div><p>Müşteri</p></div>""", unsafe_allow_html=True)
+        c2.markdown(f"""<div class="kpi-container"><div class="kpi-val" style="color:#f59e0b">{len(df[df["Durum"] == "Yeni"])}</div><p>Bekleyen</p></div>""", unsafe_allow_html=True)
+        c3.markdown(f"""<div class="kpi-container"><div class="kpi-val" style="color:#10b981">{len(df[df["Durum"] == "✅ Anlaşıldı"])}</div><p>Başarılı</p></div>""", unsafe_allow_html=True)
         
         st.write("")
         st.markdown("##### 📋 Son Hareketler")
