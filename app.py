@@ -75,21 +75,37 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
+# ŞEHİRLER (PO URL Yapısına Uygun)
 SEHIRLER = [
-    "Adana", "Adıyaman", "Afyonkarahisar", "Ağrı", "Amasya", "Ankara", "Antalya", "Artvin", "Aydın", "Balıkesir", "Bilecik", "Bingöl", "Bitlis", "Bolu", "Burdur", "Bursa", "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır", "Edirne", "Elazığ", "Erzincan", "Erzurum", "Eskişehir", "Gaziantep", "Giresun", "Gümüşhane", "Hakkari", "Hatay", "Isparta", "Mersin", "İstanbul", "İzmir", "Kars", "Kastamonu", "Kayseri", "Kırklareli", "Kırşehir", "Kocaeli", "Konya", "Kütahya", "Malatya", "Manisa", "Kahramanmaraş", "Mardin", "Muğla", "Muş", "Nevşehir", "Niğde", "Ordu", "Rize", "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Tekirdağ", "Tokat", "Trabzon", "Tunceli", "Şanlıurfa", "Uşak", "Van", "Yozgat", "Zonguldak", "Aksaray", "Bayburt", "Karaman", "Kırıkkale", "Batman", "Şırnak", "Bartın", "Ardahan", "Iğdır", "Yalova", "Karabük", "Kilis", "Osmaniye", "Düzce"
+    "Adana", "Adiyaman", "Afyonkarahisar", "Agri", "Amasya", "Ankara", "Antalya", "Artvin", "Aydin", "Balikesir", "Bilecik", "Bingol", "Bitlis", "Bolu", "Burdur", "Bursa", "Canakkale", "Cankiri", "Corum", "Denizli", "Diyarbakir", "Edirne", "Elazig", "Erzincan", "Erzurum", "Eskisehir", "Gaziantep", "Giresun", "Gumushane", "Hakkari", "Hatay", "Isparta", "Mersin", "Istanbul", "Izmir", "Kars", "Kastamonu", "Kayseri", "Kirklareli", "Kirsehir", "Kocaeli", "Konya", "Kutahya", "Malatya", "Manisa", "Kahramanmaras", "Mardin", "Mugla", "Mus", "Nevsehir", "Nigde", "Ordu", "Rize", "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Tekirdag", "Tokat", "Trabzon", "Tunceli", "Sanliurfa", "Usak", "Van", "Yozgat", "Zonguldak", "Aksaray", "Bayburt", "Karaman", "Kirikkale", "Batman", "Sirnak", "Bartin", "Ardahan", "Igdir", "Yalova", "Karabuk", "Kilis", "Osmaniye", "Duzce"
 ]
 
-# --- FİYAT ÇEKME SİMÜLASYONU ---
-def fiyat_getir(sehir):
-    # Gerçek zamanlı veri çekme bazen engellenebilir,
-    # Bu yüzden şehre göre ortalama bir fiyat döndürüp kullanıcının düzenlemesine izin veriyoruz.
-    # Gaziantep ve çevre iller için güncel piyasa ortalaması (Örnek)
-    fiyatlar = {
-        "Gaziantep": 44.50, "İstanbul": 44.20, "Ankara": 44.35, "İzmir": 44.40
-    }
-    return fiyatlar.get(sehir, 44.50) # Şehir listede yoksa varsayılan 44.50
+# --- CANLI FİYAT ÇEKME MOTORU ---
+def fiyat_cek_po(sehir_slug):
+    """Petrol Ofisi sitesinden V/Max Diesel fiyatını çeker"""
+    try:
+        sehir_kucuk = sehir_slug.lower()
+        url = f"https://www.petrolofisi.com.tr/akaryakit-fiyatlari/{sehir_kucuk}"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+        response = requests.get(url, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            # Tabloyu bul ve 3. sütunu (Genelde Motorin) al
+            table = soup.find('table')
+            if table:
+                rows = table.find_all('tr')
+                for row in rows[1:]: 
+                    cols = row.find_all('td')
+                    if len(cols) > 2:
+                        fiyat_text = cols[2].text.strip()
+                        fiyat_temiz = fiyat_text.replace('TL', '').replace(',', '.').strip()
+                        return float(fiyat_temiz)
+    except:
+        pass
+    return 0.0
 
-# --- WORD TEKLİF OLUŞTURUCU ---
+# --- WORD TEKLİF ---
 def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         doc = DocxTemplate(SABLON_DOSYASI)
@@ -448,12 +464,16 @@ elif selected == "Teklif & Hesap":
     tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word Teklif Oluştur"])
     
     with tab_hesap:
-        # ŞEHİR SEÇİMİ VE OTOMATİK FİYAT
+        # ŞEHİR VE OTOMATİK FİYAT
         col_sehir, col_bos = st.columns([2, 1])
-        secilen_sehir = col_sehir.selectbox("🌍 Hangi Şehrin Fiyatı?", SEHIRLER, index=SEHIRLER.index("Gaziantep"))
+        secilen_sehir = col_sehir.selectbox("🌍 Şehir Seç", SEHIRLER, index=SEHIRLER.index("Gaziantep"))
         
-        # Fiyatı Otomatik Çek (Veya Manuel Gir)
-        oto_fiyat = fiyat_getir(secilen_sehir)
+        # Fiyatı Otomatik Çek
+        oto_fiyat = fiyat_cek_po(secilen_sehir)
+        if oto_fiyat == 0.0: oto_fiyat = 44.0
+        
+        with col_bos:
+            st.markdown(f"<br><div style='text-align:right; font-weight:bold; color:#e30613;'>{secilen_sehir}: {oto_fiyat} TL</div>", unsafe_allow_html=True)
         
         c1, c2 = st.columns(2)
         with c1:
@@ -465,12 +485,11 @@ elif selected == "Teklif & Hesap":
         
         st.markdown("---")
         if aylik_litre > 0:
-            # POMPA İSKONTOSU HESABI
+            # HESAPLAMALAR
             indirimli_pompa = guncel_fiyat * (1 - (iskonto_orani/100))
             aylik_kazanc_pompa = (guncel_fiyat - indirimli_pompa) * aylik_litre
             yillik_kazanc_pompa = aylik_kazanc_pompa * 12
             
-            # ANLAŞMALI İSTASYON HESABI
             indirimli_ist = guncel_fiyat * (1 - (iskonto_anlasmali/100))
             aylik_kazanc_ist = (guncel_fiyat - indirimli_ist) * aylik_litre
             yillik_kazanc_ist = aylik_kazanc_ist * 12
