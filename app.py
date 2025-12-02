@@ -14,7 +14,7 @@ from docxtpl import DocxTemplate
 from fpdf import FPDF
 import io
 
-# --- 1. SAYFA AYARLARI ---
+# --- 1. SAYFA VE TASARIM AYARLARI ---
 st.set_page_config(
     page_title="Özkaraaslan Saha",
     page_icon="⛽", 
@@ -74,18 +74,6 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
-# ŞEHİR LİSTESİ
-SEHIRLER = [
-    "Adana", "Adiyaman", "Afyonkarahisar", "Agri", "Amasya", "Ankara", "Antalya", "Artvin", "Aydin", "Balikesir", 
-    "Bilecik", "Bingol", "Bitlis", "Bolu", "Burdur", "Bursa", "Canakkale", "Cankiri", "Corum", "Denizli", 
-    "Diyarbakir", "Edirne", "Elazig", "Erzincan", "Erzurum", "Eskisehir", "Gaziantep", "Giresun", "Gumushane", 
-    "Hakkari", "Hatay", "Isparta", "Mersin", "Istanbul", "Izmir", "Kars", "Kastamonu", "Kayseri", "Kirklareli", 
-    "Kirsehir", "Kocaeli", "Konya", "Kutahya", "Malatya", "Manisa", "Kahramanmaras", "Mardin", "Mugla", "Mus", 
-    "Nevsehir", "Nigde", "Ordu", "Rize", "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Tekirdag", "Tokat", 
-    "Trabzon", "Tunceli", "Sanliurfa", "Usak", "Van", "Yozgat", "Zonguldak", "Aksaray", "Bayburt", "Karaman", 
-    "Kirikkale", "Batman", "Sirnak", "Bartin", "Ardahan", "Igdir", "Yalova", "Karabuk", "Kilis", "Osmaniye", "Duzce"
-]
-
 # --- FİYAT ÇEKME MOTORU ---
 def turkce_karakter_duzelt(text):
     text = text.lower()
@@ -93,57 +81,21 @@ def turkce_karakter_duzelt(text):
     for src, target in replacements.items(): text = text.replace(src, target)
     return text
 
-@st.cache_data(ttl=3600)
-def fiyat_cek_garanti(sehir):
-    try:
-        sehir_slug = turkce_karakter_duzelt(sehir)
-        url = f"https://kur.doviz.com/akaryakit-fiyatlari/{sehir_slug}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=4)
-        if response.status_code == 200:
-            dfs = pd.read_html(response.content)
-            for df in dfs:
-                if "Petrol Ofisi" in str(df) or "PETROL OFİSİ" in str(df):
-                    for index, row in df.iterrows():
-                        if "petrol ofisi" in str(row.values).lower():
-                            values = [str(x).replace('TL', '').replace(',', '.').strip() for x in row if isinstance(x, (int, float, str))]
-                            for val in values:
-                                try:
-                                    fiyat = float(val)
-                                    if 35 < fiyat < 60: return fiyat
-                                except: continue
-    except: pass
-    return 0.0
-
-# --- TÜRKÇE KARAKTER ---
-def tr_upper(text):
-    if not text: return ""
-    return str(text).replace('i', 'İ').replace('ı', 'I').upper()
-
-def tr_title(text):
-    if not text: return ""
-    words = str(text).split()
-    new = []
-    for w in words:
-        if len(w)>0: new.append(w[0].replace('i','İ').replace('ı','I').upper() + w[1:].replace('I','ı').replace('İ','i').lower())
-    return " ".join(new)
-
-# --- PDF İÇİN FONT DÜZELTME ---
+# PDF İÇİN FONT DÜZELTME
 def tr_pdf(text):
     replacements = {'ğ':'g','Ğ':'G','ü':'u','Ü':'U','ş':'s','Ş':'S','ı':'i','İ':'I','ö':'o','Ö':'O','ç':'c','Ç':'C'}
     for k,v in replacements.items(): text = text.replace(k, v)
     return text
 
-# --- WORD TEKLİF ---
+# --- WORD TEKLİF OLUŞTURUCU ---
 def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         doc = DocxTemplate(SABLON_DOSYASI)
-        # YÜZDE İŞARETİ EKLENDİ
         context = {
-            'firma_adi': tr_upper(firma_adi), 
-            'yetkili': tr_title(yetkili),
-            'iskonto_pompa': f"% {iskonto_pompa}",       # % işareti eklendi
-            'iskonto_istasyon': f"% {iskonto_istasyon}", # % işareti eklendi
+            'firma_adi': str(firma_adi).upper(), 
+            'yetkili': str(yetkili),
+            'iskonto_pompa': f"% {iskonto_pompa}",       
+            'iskonto_istasyon': f"% {iskonto_istasyon}", 
             'odeme_sekli': str(odeme_sekli), 
             'tarih': datetime.now().strftime("%d.%m.%Y")
         }
@@ -153,7 +105,7 @@ def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli,
         return bio.getvalue()
     except: return None
 
-# --- PDF TEKLİF (YEDEK) ---
+# --- PDF TEKLİF OLUŞTURUCU ---
 def pdf_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         pdf = FPDF()
@@ -302,7 +254,6 @@ st.write("")
 if selected == "Pano":
     tarih_str = datetime.now().strftime("%d %B %Y")
     st.markdown(f"""<div class="hero-card"><h3>👋 Merhaba, Müdürüm</h3><p>{tarih_str} | Saha Operasyon Paneli</p></div>""", unsafe_allow_html=True)
-    st.link_button("⛽ GÜNCEL AKARYAKIT FİYATLARI (LİSTE)", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
     
     df = veri_tabanini_yukle()
     if not df.empty:
@@ -525,27 +476,26 @@ elif selected == "Müşteriler":
 # --- YENİ TAB: TEKLİF & HESAP ---
 elif selected == "Teklif & Hesap":
     st.markdown("#### 🧮 Hesaplama & Teklif")
+    
+    # Fiyat Linki (En tepede)
+    st.link_button("⛽ GÜNCEL FİYAT LİSTESİ (Yeni Sekme)", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
+    
+    st.write("")
+    
     tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word Teklif Oluştur"])
     
     with tab_hesap:
-        col_sehir, col_bos = st.columns([2, 1])
-        secilen_sehir = col_sehir.selectbox("🌍 Şehir Seç", SEHIRLER, index=SEHIRLER.index("Gaziantep"))
+        # MANUEL FİYAT GİRİŞİ
+        if 'manual_price' not in st.session_state: st.session_state['manual_price'] = 44.50 
+        guncel_fiyat_giris = st.number_input("⛽ LÜTFEN GÜNCEL POMPA FİYATINI GİRİN (TL):", value=st.session_state['manual_price'], step=0.10)
+        st.session_state['manual_price'] = guncel_fiyat_giris 
+
+        st.markdown("---")
         
-        # --- FİYAT ÇEKME İŞLEMİ ---
-        oto_fiyat = 0.0
-        with st.spinner("Güncel fiyat alınıyor..."):
-            oto_fiyat = fiyat_cek_garanti(secilen_sehir)
-        
-        if oto_fiyat == 0.0:
-            st.warning("⚠️ Otomatik fiyat alınamadı. Lütfen manuel giriniz.")
-            oto_fiyat = 44.00 
-        else:
-            st.success(f"✅ Güncel PO Fiyatı: {oto_fiyat} TL")
-            
         c1, c2 = st.columns(2)
         with c1:
             aylik_litre = st.number_input("Aylık Tüketim (Litre)", min_value=0, value=1000)
-            guncel_fiyat = st.number_input("Pompa Fiyatı (TL)", value=oto_fiyat)
+            guncel_fiyat = st.number_input("Baz Alınan Fiyat", value=st.session_state['manual_price'], disabled=True)
         with c2:
             iskonto_orani = st.number_input("Pompa İskonto (%)", min_value=0.0, max_value=15.0, value=3.0)
             iskonto_anlasmali = st.number_input("Anlaşmalı İstasyon İskonto (%)", min_value=0.0, max_value=15.0, value=0.0)
@@ -588,7 +538,7 @@ elif selected == "Teklif & Hesap":
                 """, unsafe_allow_html=True)
 
     with tab_pdf:
-        st.info("👇 Word Şablonu Doldur")
+        st.info("👇 Word veya PDF Teklif Oluştur")
         with st.form("pdf_form"):
             p_firma = st.text_input("Firma Adı")
             p_yetkili = st.text_input("Yetkili")
@@ -608,6 +558,7 @@ elif selected == "Teklif & Hesap":
             
             generate_btn = st.form_submit_button("📄 Teklif Oluştur (Word & PDF)")
         
+        # İndirme Butonları
         if generate_btn:
             if p_firma:
                 col_d1, col_d2 = st.columns(2)
