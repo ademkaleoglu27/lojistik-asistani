@@ -73,14 +73,6 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
-# Türkçe karakter düzeltme
-def sehir_duzelt(sehir):
-    tr_map = {'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', 'İ': 'i', 'Ğ': 'g', 'Ü': 'u', 'Ş': 's', 'Ö': 'o', 'Ç': 'c'}
-    sehir = sehir.lower()
-    for k, v in tr_map.items():
-        sehir = sehir.replace(k, v)
-    return sehir
-
 SEHIRLER = [
     "Adana", "Adiyaman", "Afyonkarahisar", "Agri", "Amasya", "Ankara", "Antalya", "Artvin", "Aydin", "Balikesir", 
     "Bilecik", "Bingol", "Bitlis", "Bolu", "Burdur", "Bursa", "Canakkale", "Cankiri", "Corum", "Denizli", 
@@ -92,28 +84,52 @@ SEHIRLER = [
     "Kirikkale", "Batman", "Sirnak", "Bartin", "Ardahan", "Igdir", "Yalova", "Karabuk", "Kilis", "Osmaniye", "Duzce"
 ]
 
-# --- FİYAT ÇEKME MOTORU (Stabil) ---
-@st.cache_data(ttl=3600)
+# --- FİYAT ÇEKME MOTORU (V42.0 - GÜÇLENDİRİLMİŞ) ---
+def turkce_karakter_duzelt(text):
+    text = text.lower()
+    replacements = {'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', ' ': '-'}
+    for src, target in replacements.items():
+        text = text.replace(src, target)
+    return text
+
+# Cache'i kaldırdık ki her seferinde taze çeksin
 def fiyat_cek_garanti(sehir):
+    """Döviz.com üzerinden motorin fiyatını çeker (Daha stabil)"""
     try:
-        sehir_slug = sehir_duzelt(sehir)
-        url = f"https://www.haberler.com/akaryakit-fiyatlari/{sehir_slug}/"
-        headers = {'User-Agent': 'Mozilla/5.0'}
+        sehir_slug = turkce_karakter_duzelt(sehir)
+        url = f"https://kur.doviz.com/akaryakit-fiyatlari/{sehir_slug}"
+        
+        # Gerçek bir tarayıcı gibi görün
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        
         response = requests.get(url, headers=headers, timeout=5)
+        
         if response.status_code == 200:
+            # Pandas ile sayfadaki tabloları oku
             dfs = pd.read_html(response.content)
-            for df in dfs:
-                if "Petrol Ofisi" in str(df) or "PETROL OFİSİ" in str(df):
-                    for index, row in df.iterrows():
-                        row_str = str(row).lower()
-                        if "petrol ofisi" in row_str:
-                            values = [str(x).replace('TL', '').replace(',', '.').strip() for x in row if isinstance(x, (int, float, str))]
-                            for val in values:
+            
+            if dfs:
+                df = dfs[0] # Genelde ilk tablo fiyat tablosudur
+                # Tabloyu tara
+                for index, row in df.iterrows():
+                    # Satırın tamamını string yapıp "Motorin" kelimesini ara
+                    row_str = str(row.values).lower()
+                    if "motorin" in row_str:
+                        # O satırdaki sayıları bul
+                        for item in row:
+                            if isinstance(item, (int, float, str)):
+                                # Sayıya çevirmeyi dene
+                                clean_item = str(item).replace('TL', '').replace(',', '.').strip()
                                 try:
-                                    fiyat = float(val)
-                                    if 35 < fiyat < 60: return fiyat
+                                    fiyat = float(clean_item)
+                                    if 35 < fiyat < 60: # Mantıklı fiyat aralığı
+                                        return fiyat
                                 except: continue
-    except: pass
+    except:
+        pass
+    
     return 0.0
 
 # --- WORD TEKLİF ---
@@ -129,8 +145,7 @@ def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli,
         bio = io.BytesIO()
         doc.save(bio)
         return bio.getvalue()
-    except Exception as e:
-        return None
+    except: return None
 
 # --- GOOGLE SHEETS ---
 def get_google_sheet_client():
@@ -373,7 +388,6 @@ elif selected == "Müşteriler":
                     val_hatirlat_tar = secilen_veri.get('Hatirlatici_Tarih')
                     if pd.isna(val_hatirlat_tar): val_hatirlat_tar = None
                     yeni_hatirlat_tar = col_date.date_input("Tarih", value=val_hatirlat_tar)
-                    
                     val_hatirlat_saat = secilen_veri.get('Hatirlatici_Saat', '09:00')
                     try: time_obj = datetime.strptime(str(val_hatirlat_saat), '%H:%M').time()
                     except: time_obj = datetime.strptime('09:00', '%H:%M').time()
@@ -395,7 +409,6 @@ elif selected == "Müşteriler":
                 if yeni_dosya and "http" in yeni_dosya:
                     st.link_button("📂 Dosyayı Aç", yeni_dosya, type="secondary", use_container_width=True)
                 
-                # DÜZELTME: submit button formun içinde olmalı
                 kaydet_btn = st.form_submit_button("💾 Kaydet", type="primary", use_container_width=True)
             
             if kaydet_btn:
@@ -478,18 +491,20 @@ elif selected == "Teklif & Hesap":
     tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word Teklif Oluştur"])
     
     with tab_hesap:
+        # ŞEHİR SEÇİMİ VE OTOMATİK FİYAT
         col_sehir, col_bos = st.columns([2, 1])
         secilen_sehir = col_sehir.selectbox("🌍 Şehir Seç", SEHIRLER, index=SEHIRLER.index("Gaziantep"))
         
-        # Fiyatı çek
-        with st.spinner("Güncel fiyat çekiliyor..."):
-            oto_fiyat = fiyat_cek_garanti(secilen_sehir)
-            
+        # Fiyatı Otomatik Çek
+        oto_fiyat = 0.0
+        with st.spinner("Fiyat alınıyor..."):
+            oto_fiyat = fiyat_cek_po(secilen_sehir)
+        
         if oto_fiyat == 0.0:
-            st.warning("⚠️ Fiyat çekilemedi, manuel giriniz.")
-            oto_fiyat = 44.00
+            st.warning("⚠️ Otomatik fiyat çekilemedi. Lütfen manuel giriniz.")
+            oto_fiyat = 44.00 # Varsayılan
         else:
-            st.success(f"✅ {secilen_sehir} V/Max: {oto_fiyat} TL")
+            st.success(f"✅ {secilen_sehir}: {oto_fiyat} TL")
             
         c1, c2 = st.columns(2)
         with c1:
@@ -501,6 +516,7 @@ elif selected == "Teklif & Hesap":
         
         st.markdown("---")
         if aylik_litre > 0:
+            # HESAPLAMALAR
             indirimli_pompa = guncel_fiyat * (1 - (iskonto_orani/100))
             aylik_kazanc_pompa = (guncel_fiyat - indirimli_pompa) * aylik_litre
             yillik_kazanc_pompa = aylik_kazanc_pompa * 12
@@ -537,36 +553,36 @@ elif selected == "Teklif & Hesap":
 
     with tab_pdf:
         st.info("👇 Word Şablonu Doldur")
-        try:
-            with st.form("pdf_form"):
-                p_firma = st.text_input("Firma Adı")
-                p_yetkili = st.text_input("Yetkili")
-                
-                col_pdf1, col_pdf2 = st.columns(2)
-                p_iskonto_pompa = col_pdf1.number_input("Pompa İskonto (%)", value=3.0)
-                p_iskonto_istasyon = col_pdf2.number_input("Anlaşmalı İst. İskonto (%)", value=0.0)
-                
-                odeme_secenekleri = [
-                    "Fatura Kesiminden 5 Gün Sonra", 
-                    "Fatura Kesiminden 10 Gün Sonra", 
-                    "Fatura Kesiminden 15 Gün Sonra",
-                    "Ayın 5'i", "Ayın 10'u", "Ayın 15'i", "Ayın 20'si", "Ayın 25'i",
-                    "Ön Ödeme (Havale/EFT)", "Kredi Kartı ile Ödeme", "DBS (Doğrudan Borçlandırma)"
-                ]
-                p_odeme = st.selectbox("Ödeme/Vade Şekli", odeme_secenekleri)
-                
-                generate_btn = st.form_submit_button("📄 Teklif Oluştur")
+        with st.form("pdf_form"):
+            p_firma = st.text_input("Firma Adı")
+            p_yetkili = st.text_input("Yetkili")
             
-            if generate_btn:
-                if p_firma:
+            col_pdf1, col_pdf2 = st.columns(2)
+            p_iskonto_pompa = col_pdf1.number_input("Pompa İskonto (%)", value=3.0)
+            p_iskonto_istasyon = col_pdf2.number_input("Anlaşmalı İst. İskonto (%)", value=0.0)
+            
+            odeme_secenekleri = [
+                "Fatura Kesiminden 5 Gün Sonra", 
+                "Fatura Kesiminden 10 Gün Sonra", 
+                "Fatura Kesiminden 15 Gün Sonra",
+                "Ayın 5'i", "Ayın 10'u", "Ayın 15'i", "Ayın 20'si", "Ayın 25'i",
+                "Ön Ödeme (Havale/EFT)", "Kredi Kartı ile Ödeme", "DBS (Doğrudan Borçlandırma)"
+            ]
+            p_odeme = st.selectbox("Ödeme/Vade Şekli", odeme_secenekleri)
+            
+            generate_btn = st.form_submit_button("📄 Teklif Oluştur")
+        
+        if generate_btn:
+            if p_firma:
+                try:
                     word_bytes = word_teklif_olustur(p_firma, p_iskonto_pompa, p_iskonto_istasyon, p_odeme, p_yetkili)
                     if word_bytes:
                         st.download_button("📥 WORD İNDİR", word_bytes, f"{p_firma}_Teklif.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", type="primary")
                     else:
                         st.error("Şablon dosyası (teklif_sablonu.docx) GitHub'da bulunamadı!")
-                else: st.error("Firma adı giriniz.")
-        except Exception as e:
-            st.error(f"PDF Modülü Hatası: {e}")
+                except Exception as e:
+                    st.error(f"Hata: {e}")
+            else: st.error("Firma adı giriniz.")
 
 # --- AJANDA ---
 elif selected == "Ajanda":
