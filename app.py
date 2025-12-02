@@ -32,10 +32,8 @@ def local_css():
         .kpi-val { font-size: 1.4rem; font-weight: 700; color: #1f2937; }
         .stButton>button { border-radius: 8px; height: 45px; font-weight: 600; width: 100%; }
         .nav-link-selected { background-color: #e30613 !important; }
-        
         .compare-box { padding: 20px; border-radius: 12px; text-align: center; color: #333; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .price-tag { font-size: 1.8rem; font-weight: 800; margin: 10px 0; }
-        
         #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -98,7 +96,9 @@ def fiyat_cek_po(sehir):
     try:
         sehir_slug = turkce_karakter_duzelt(sehir)
         url = f"https://www.petrolofisi.com.tr/akaryakit-fiyatlari/{sehir_slug}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
         response = requests.get(url, headers=headers, timeout=5)
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -107,11 +107,12 @@ def fiyat_cek_po(sehir):
                 rows = table.find_all('tr')
                 if len(rows) > 1:
                     cols = rows[1].find_all('td')
+                    # Tablo yapısı değişebilir, güvenli arama
                     for col in cols:
-                        # Basit mantık: İçinde rakam ve virgül olan, 30-60 arası değeri al
                         text = col.text.strip().replace('TL', '').replace(',', '.').strip()
                         try:
                             val = float(text)
+                            # Mantık kontrolü: Fiyat 35 ile 60 arasındaysa muhtemelen doğrudur
                             if 35 < val < 60: return val
                         except: continue
     except: pass
@@ -172,8 +173,13 @@ def veriyi_kaydet(df):
         sheet = client.open(SHEET_ADI).sheet1
         df_save = df.copy()
         for col in ["Hatirlatici_Tarih", "Sozlesme_Tarihi", "Ziyaret_Tarihi"]:
-            if col in df_save.columns: df_save[col] = pd.to_datetime(df_save[col], errors='coerce').dt.strftime('%Y-%m-%d')
-        df_save = df_save.fillna("")
+            if col in df_save.columns:
+                df_save[col] = pd.to_datetime(df_save[col], errors='coerce').dt.strftime('%Y-%m-%d')
+        
+        # KRİTİK: JSON hatasını önlemek için her şeyi string yap ve nan'ları temizle
+        df_save = df_save.astype(str)
+        df_save = df_save.replace("nan", "").replace("NaT", "").replace("None", "")
+        
         sheet.clear()
         sheet.update([df_save.columns.values.tolist()] + df_save.values.tolist())
         st.cache_data.clear()
@@ -476,11 +482,9 @@ elif selected == "Teklif & Hesap":
     tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word Teklif Oluştur"])
     
     with tab_hesap:
-        # ŞEHİR SEÇİMİ VE OTOMATİK FİYAT
         col_sehir, col_bos = st.columns([2, 1])
         secilen_sehir = col_sehir.selectbox("🌍 Şehir Seç", SEHIRLER, index=SEHIRLER.index("Gaziantep"))
         
-        # Fiyatı Otomatik Çek (Veya Manuel Gir)
         oto_fiyat = fiyat_cek_po(secilen_sehir)
         if oto_fiyat == 0.0: oto_fiyat = 44.0
         
@@ -497,7 +501,6 @@ elif selected == "Teklif & Hesap":
         
         st.markdown("---")
         if aylik_litre > 0:
-            # HESAPLAMALAR
             indirimli_pompa = guncel_fiyat * (1 - (iskonto_orani/100))
             aylik_kazanc_pompa = (guncel_fiyat - indirimli_pompa) * aylik_litre
             yillik_kazanc_pompa = aylik_kazanc_pompa * 12
@@ -507,7 +510,6 @@ elif selected == "Teklif & Hesap":
             yillik_kazanc_ist = aylik_kazanc_ist * 12
             
             col_res1, col_res2 = st.columns(2)
-            
             with col_res1:
                 st.markdown(f"""
                 <div class='compare-box' style='background:#e0f2fe; border:1px solid #7dd3fc;'>
@@ -519,7 +521,6 @@ elif selected == "Teklif & Hesap":
                     <p>Yıllık Kazanç: <b>{yillik_kazanc_pompa:,.2f} TL</b></p>
                 </div>
                 """, unsafe_allow_html=True)
-                
             with col_res2:
                 st.markdown(f"""
                 <div class='compare-box' style='background:#dcfce7; border:1px solid #86efac;'>
