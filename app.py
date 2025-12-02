@@ -33,20 +33,8 @@ def local_css():
         .stButton>button { border-radius: 8px; height: 45px; font-weight: 600; width: 100%; }
         .nav-link-selected { background-color: #e30613 !important; }
         
-        /* Karşılaştırma Kutuları */
-        .compare-box {
-            padding: 20px;
-            border-radius: 12px;
-            text-align: center;
-            color: #333;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-        .price-tag {
-            font-size: 1.8rem;
-            font-weight: 800;
-            margin: 10px 0;
-        }
+        .compare-box { padding: 20px; border-radius: 12px; text-align: center; color: #333; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .price-tag { font-size: 1.8rem; font-weight: 800; margin: 10px 0; }
         
         #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     </style>
@@ -76,8 +64,9 @@ if not st.session_state['giris_yapildi']:
 
 # --- SABİTLER ---
 SHEET_ADI = "Lojistik_Verileri"
-API_KEY = "AIzaSyCw0bhZ2WTrZtThjgJBMsbjZ7IDh6QN0Og" 
+API_KEY = "AIzaSyCw0bhZ2WTrZtThjgJBMsbjZ7IDh6QN0Og"
 SABLON_DOSYASI = "teklif_sablonu.docx" 
+LOGO_URL = "https://www.ozkaraaslanfilo.com/wp-content/uploads/2021/01/logo.png"
 
 SEKTORLER = {
     "🚛 Lojistik": "Lojistik Firmaları", "📦 Nakliye": "Yurt İçi Nakliye Firmaları", "🌍 Uluslararası": "Uluslararası Transport",
@@ -86,24 +75,34 @@ SEKTORLER = {
     "🏥 Sağlık/Rehab": "Özel Eğitim ve Rehabilitasyon", "🥕 Gıda Toptancı": "Gıda Toptancıları"
 }
 
+SEHIRLER = [
+    "Adana", "Adıyaman", "Afyonkarahisar", "Ağrı", "Amasya", "Ankara", "Antalya", "Artvin", "Aydın", "Balıkesir", "Bilecik", "Bingöl", "Bitlis", "Bolu", "Burdur", "Bursa", "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır", "Edirne", "Elazığ", "Erzincan", "Erzurum", "Eskişehir", "Gaziantep", "Giresun", "Gümüşhane", "Hakkari", "Hatay", "Isparta", "Mersin", "İstanbul", "İzmir", "Kars", "Kastamonu", "Kayseri", "Kırklareli", "Kırşehir", "Kocaeli", "Konya", "Kütahya", "Malatya", "Manisa", "Kahramanmaraş", "Mardin", "Muğla", "Muş", "Nevşehir", "Niğde", "Ordu", "Rize", "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas", "Tekirdağ", "Tokat", "Trabzon", "Tunceli", "Şanlıurfa", "Uşak", "Van", "Yozgat", "Zonguldak", "Aksaray", "Bayburt", "Karaman", "Kırıkkale", "Batman", "Şırnak", "Bartın", "Ardahan", "Iğdır", "Yalova", "Karabük", "Kilis", "Osmaniye", "Düzce"
+]
+
+# --- FİYAT ÇEKME SİMÜLASYONU ---
+def fiyat_getir(sehir):
+    # Gerçek zamanlı veri çekme bazen engellenebilir,
+    # Bu yüzden şehre göre ortalama bir fiyat döndürüp kullanıcının düzenlemesine izin veriyoruz.
+    # Gaziantep ve çevre iller için güncel piyasa ortalaması (Örnek)
+    fiyatlar = {
+        "Gaziantep": 44.50, "İstanbul": 44.20, "Ankara": 44.35, "İzmir": 44.40
+    }
+    return fiyatlar.get(sehir, 44.50) # Şehir listede yoksa varsayılan 44.50
+
 # --- WORD TEKLİF OLUŞTURUCU ---
 def word_teklif_olustur(firma_adi, iskonto_pompa, iskonto_istasyon, odeme_sekli, yetkili):
     try:
         doc = DocxTemplate(SABLON_DOSYASI)
         context = {
-            'firma_adi': firma_adi,
-            'yetkili': yetkili,
-            'iskonto_pompa': iskonto_pompa,
-            'iskonto_istasyon': iskonto_istasyon,
-            'odeme_sekli': odeme_sekli,
-            'tarih': datetime.now().strftime("%d.%m.%Y")
+            'firma_adi': firma_adi, 'yetkili': yetkili,
+            'iskonto_pompa': iskonto_pompa, 'iskonto_istasyon': iskonto_istasyon,
+            'odeme_sekli': odeme_sekli, 'tarih': datetime.now().strftime("%d.%m.%Y")
         }
         doc.render(context)
         bio = io.BytesIO()
         doc.save(bio)
         return bio.getvalue()
-    except Exception as e:
-        return None
+    except: return None
 
 # --- GOOGLE SHEETS ---
 def get_google_sheet_client():
@@ -201,7 +200,7 @@ def detay_getir(place_id):
 # --- ANA EKRAN ---
 col_logo, col_menu = st.columns([1, 6])
 with col_logo:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/2/2e/Petrol_Ofisi_logo.svg", width=60)
+    st.image(LOGO_URL, width=60)
 with col_menu:
     selected = option_menu(
         menu_title=None,
@@ -223,6 +222,7 @@ st.write("")
 if selected == "Pano":
     tarih_str = datetime.now().strftime("%d %B %Y")
     st.markdown(f"""<div class="hero-card"><h3>👋 Merhaba, Müdürüm</h3><p>{tarih_str} | Saha Operasyon Paneli</p></div>""", unsafe_allow_html=True)
+    st.link_button("⛽ GÜNCEL AKARYAKIT FİYATLARI", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
     
     df = veri_tabanini_yukle()
     if not df.empty:
@@ -337,7 +337,7 @@ elif selected == "Müşteriler":
                     try: m_idx = durum_listesi.index(secilen_veri['Durum'])
                     except: m_idx = 0
                     yeni_durum = st.selectbox("Durum", durum_listesi, index=m_idx)
-                    yeni_tuketim = st.text_input("Tüketim", value=secilen_veri.get('Tuketim_Bilgisi', ''))
+                    yeni_tuketim = st.text_input("Tüketim (m3/Ton)", value=secilen_veri.get('Tuketim_Bilgisi', ''))
                     yeni_iskonto = st.text_input("💸 İskonto (%)", value=secilen_veri.get('Iskonto_Orani', ''))
                     
                     st.write("🗓️ **Randevu & Bildirim**")
@@ -442,34 +442,41 @@ elif selected == "Müşteriler":
                 st.rerun()
             else: st.error("Firma Adı zorunlu.")
 
-# --- TEKLİF & HESAP ---
+# --- YENİ TAB: TEKLİF & HESAP ---
 elif selected == "Teklif & Hesap":
     st.markdown("#### 🧮 Hesaplama & Teklif")
-    st.link_button("⛽ GÜNCEL AKARYAKIT FİYATLARI", "https://www.petrolofisi.com.tr/akaryakit-fiyatlari", type="primary", use_container_width=True)
-    st.write("")
-    
     tab_hesap, tab_pdf = st.tabs(["💰 Tasarruf Hesapla", "📑 Word Teklif Oluştur"])
     
     with tab_hesap:
+        # ŞEHİR SEÇİMİ VE OTOMATİK FİYAT
+        col_sehir, col_bos = st.columns([2, 1])
+        secilen_sehir = col_sehir.selectbox("🌍 Hangi Şehrin Fiyatı?", SEHIRLER, index=SEHIRLER.index("Gaziantep"))
+        
+        # Fiyatı Otomatik Çek (Veya Manuel Gir)
+        oto_fiyat = fiyat_getir(secilen_sehir)
+        
         c1, c2 = st.columns(2)
         with c1:
             aylik_litre = st.number_input("Aylık Tüketim (Litre)", min_value=0, value=1000)
-            guncel_fiyat = st.number_input("Pompa Fiyatı (TL)", value=40.0)
+            guncel_fiyat = st.number_input("Pompa Fiyatı (TL)", value=oto_fiyat)
         with c2:
             iskonto_orani = st.number_input("Pompa İskonto (%)", min_value=0.0, max_value=15.0, value=3.0)
             iskonto_anlasmali = st.number_input("Anlaşmalı İstasyon İskonto (%)", min_value=0.0, max_value=15.0, value=0.0)
         
         st.markdown("---")
         if aylik_litre > 0:
+            # POMPA İSKONTOSU HESABI
             indirimli_pompa = guncel_fiyat * (1 - (iskonto_orani/100))
             aylik_kazanc_pompa = (guncel_fiyat - indirimli_pompa) * aylik_litre
             yillik_kazanc_pompa = aylik_kazanc_pompa * 12
             
+            # ANLAŞMALI İSTASYON HESABI
             indirimli_ist = guncel_fiyat * (1 - (iskonto_anlasmali/100))
             aylik_kazanc_ist = (guncel_fiyat - indirimli_ist) * aylik_litre
             yillik_kazanc_ist = aylik_kazanc_ist * 12
             
             col_res1, col_res2 = st.columns(2)
+            
             with col_res1:
                 st.markdown(f"""
                 <div class='compare-box' style='background:#e0f2fe; border:1px solid #7dd3fc;'>
@@ -481,6 +488,7 @@ elif selected == "Teklif & Hesap":
                     <p>Yıllık Kazanç: <b>{yillik_kazanc_pompa:,.2f} TL</b></p>
                 </div>
                 """, unsafe_allow_html=True)
+                
             with col_res2:
                 st.markdown(f"""
                 <div class='compare-box' style='background:#dcfce7; border:1px solid #86efac;'>
@@ -494,7 +502,7 @@ elif selected == "Teklif & Hesap":
                 """, unsafe_allow_html=True)
 
     with tab_pdf:
-        st.info("👇 Word Şablonu Doldur (teklif_sablonu.docx gerekli)")
+        st.info("👇 Word Şablonu Doldur")
         with st.form("pdf_form"):
             p_firma = st.text_input("Firma Adı")
             p_yetkili = st.text_input("Yetkili")
